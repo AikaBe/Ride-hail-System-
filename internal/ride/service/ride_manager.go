@@ -3,44 +3,28 @@ package service
 import (
 	"context"
 	"fmt"
-	"ride-hail/internal/ride/repository"
-	"time"
 	"math"
+	"ride-hail/internal/ride/model"
+	"ride-hail/internal/ride/repository"
+
+	"time"
 )
 
-type RideManager struct {
-	Repo *repository.RideRepository
+type RideRepository interface {
+	InsertRide(ctx context.Context, rideNumber, passengerID, rideType string, fare float64, pickupCoordID, destCoordID string) (string, error)
+	InsertCoordinate(ctx context.Context, entityID, entityType, address string, latitude, longitude float64) (string, error)
+	CancelRide(ctx context.Context, rideID, reason string) (*repository.CancelRideResponse, error)
 }
 
-func NewRideManager(repo *repository.RideRepository) *RideManager {
+type RideManager struct {
+	Repo RideRepository
+}
+
+func NewRideManager(repo RideRepository) *RideManager {
 	return &RideManager{Repo: repo}
 }
 
-type RideRequest struct {
-	PassengerID          string  `json:"passenger_id"`
-	PickupLatitude       float64 `json:"pickup_latitude"`
-	PickupLongitude      float64 `json:"pickup_longitude"`
-	PickupAddress        string  `json:"pickup_address"`
-	DestinationLatitude  float64 `json:"destination_latitude"`
-	DestinationLongitude float64 `json:"destination_longitude"`
-	DestinationAddress   string  `json:"destination_address"`
-	RideType             string  `json:"ride_type"`
-}
-
-type RideResponse struct {
-	RideID                   string  `json:"ride_id"`
-	RideNumber               string  `json:"ride_number"`
-	Status                   string  `json:"status"`
-	EstimatedFare            float64 `json:"estimated_fare"`
-	EstimatedDurationMinutes float64 `json:"estimated_duration_minutes"`
-	EstimatedDistanceKm      float64 `json:"estimated_distance_km"`
-}
-
-type CancelRideRequest struct {
-	Reason string `json:"reason"`
-}
-
-func (m *RideManager) CreateRide(ctx context.Context, req RideRequest) (*RideResponse, error) {
+func (m *RideManager) CreateRide(ctx context.Context, req model.RideRequest) (*model.RideResponse, error) {
 	// Validate required fields
 	if req.PassengerID == "" {
 		return nil, fmt.Errorf("missing passenger_id")
@@ -89,7 +73,7 @@ func (m *RideManager) CreateRide(ctx context.Context, req RideRequest) (*RideRes
 	// Update coordinates with actual ride ID
 	// This would typically be done in a more sophisticated way, but for now we'll proceed
 
-	return &RideResponse{
+	return &model.RideResponse{
 		RideID:                   rideID,
 		RideNumber:               rideNumber,
 		Status:                   "REQUESTED",
@@ -124,29 +108,29 @@ func calculateRoute(pickupLat, pickupLng, destLat, destLng float64) (distanceKm,
 	// Simplified calculation using Haversine formula for demonstration
 	// In production, you would use a proper routing service
 	const earthRadiusKm = 6371.0
-	
+
 	lat1 := pickupLat * (3.141592653589793 / 180.0)
 	lng1 := pickupLng * (3.141592653589793 / 180.0)
 	lat2 := destLat * (3.141592653589793 / 180.0)
 	lng2 := destLng * (3.141592653589793 / 180.0)
-	
+
 	dlat := lat2 - lat1
 	dlng := lng2 - lng1
-	
+
 	a := math.Sin(dlat/2)*math.Sin(dlat/2) + math.Cos(lat1)*math.Cos(lat2)*math.Sin(dlng/2)*math.Sin(dlng/2)
 	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
-	
+
 	distanceKm = earthRadiusKm * c
-	
+
 	// Assume average speed of 30 km/h in urban areas
 	durationMin = (distanceKm / 30.0) * 60.0
-	
+
 	return distanceKm, durationMin, nil
 }
 
 func calculateFare(rideType string, distanceKm, durationMin float64) (float64, error) {
 	var baseFare, perKm, perMin float64
-	
+
 	switch rideType {
 	case "ECONOMY":
 		baseFare, perKm, perMin = 500, 100, 50
@@ -157,6 +141,6 @@ func calculateFare(rideType string, distanceKm, durationMin float64) (float64, e
 	default:
 		return 0, fmt.Errorf("invalid ride_type: %s", rideType)
 	}
-	
+
 	return baseFare + (distanceKm * perKm) + (durationMin * perMin), nil
 }

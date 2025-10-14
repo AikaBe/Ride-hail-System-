@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"ride-hail/internal/common/models"
+	"ride-hail/internal/common/model"
 
 	"ride-hail/internal/driver/service"
 )
@@ -21,7 +21,7 @@ func (h *Handler) GoOnline(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	driverID := r.PathValue("driver_id")
 
-	var req models.OnlineRequest
+	var req model.OnlineRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
@@ -65,7 +65,7 @@ func (h *Handler) Location(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	driverID := r.PathValue("driver_id")
 
-	var req models.LocationRequest
+	var req model.LocationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
@@ -90,13 +90,13 @@ func (h *Handler) Location(w http.ResponseWriter, r *http.Request) {
 //	ctx := context.Background()
 //	driverID := r.PathValue("driver_id")
 //
-//	var req models.StartRequest
+//	var req model.StartRequest
 //	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 //		http.Error(w, "invalid request", http.StatusBadRequest)
 //		return
 //	}
 //
-//	location := models.Location{
+//	location := model.Location{
 //		Latitude:  req.DriverLocation.Latitude,
 //		Longitude: req.DriverLocation.Longitude,
 //	}

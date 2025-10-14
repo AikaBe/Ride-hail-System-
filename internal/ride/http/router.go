@@ -1,12 +1,9 @@
 package http
 
 import (
+	"encoding/json"
 	"net/http"
 	"strings"
-	"encoding/json"
-
-
-	
 )
 
 func SetupRoutes(mux *http.ServeMux, rideHandler *RideHandler) {
@@ -25,7 +22,7 @@ func SetupRoutes(mux *http.ServeMux, rideHandler *RideHandler) {
 				http.Error(w, "ride_id is required", http.StatusBadRequest)
 				return
 			}
-			
+
 			var req struct {
 				Reason string `json:"reason"`
 			}

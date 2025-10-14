@@ -1,4 +1,4 @@
-package models
+package model
 
 type OnlineRequest struct {
 	Latitude  float64 `json:"latitude"`

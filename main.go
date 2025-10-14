@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	cmdDriver "ride-hail/cmd/driver-location-service"
 	cmdRide "ride-hail/cmd/ride-service"
 	"ride-hail/internal/common/config"
 	"ride-hail/internal/common/db"
@@ -37,5 +38,5 @@ func main() {
 	defer rmq.Close()
 
 	cmdRide.Run(cfg, pg.Conn, rmq)
-	//cmdDriver.DriverMain(cfg, pg.Conn)
+	cmdDriver.DriverMain(cfg, pg.Conn)
 }

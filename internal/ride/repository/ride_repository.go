@@ -3,22 +3,21 @@ package repository
 import (
 	"context"
 	"fmt"
-	"ride-hail/internal/common/db"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 )
 
 type RideRepository struct {
-	DB *db.Postgres
+	DB *pgx.Conn
 }
 
-func NewRideRepository(database *db.Postgres) *RideRepository {
+func NewRideRepository(database *pgx.Conn) *RideRepository {
 	return &RideRepository{DB: database}
 }
 
 func (r *RideRepository) InsertRide(ctx context.Context, rideNumber, passengerID, rideType string, fare float64, pickupCoordID, destCoordID string) (string, error) {
-	tx, err := r.DB.Pool.Begin(ctx)
+	tx, err := r.DB.Begin(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to begin transaction: %w", err)
 	}
@@ -59,7 +58,7 @@ func (r *RideRepository) InsertCoordinate(ctx context.Context, entityID, entityT
 		RETURNING id;
 	`
 	var id string
-	err := r.DB.Pool.QueryRow(ctx, query, entityID, entityType, address, latitude, longitude).Scan(&id)
+	err := r.DB.QueryRow(ctx, query, entityID, entityType, address, latitude, longitude).Scan(&id)
 	return id, err
 }
 
@@ -71,7 +70,7 @@ type CancelRideResponse struct {
 }
 
 func (r *RideRepository) CancelRide(ctx context.Context, rideID, reason string) (*CancelRideResponse, error) {
-	tx, err := r.DB.Pool.Begin(ctx)
+	tx, err := r.DB.Begin(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}

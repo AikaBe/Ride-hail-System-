@@ -3,6 +3,7 @@ package http
 import (
 	"encoding/json"
 	"net/http"
+	"ride-hail/internal/ride/model"
 	"ride-hail/internal/ride/service"
 )
 
@@ -15,7 +16,7 @@ func NewRideHandler(manager *service.RideManager) *RideHandler {
 }
 
 func (h *RideHandler) CreateRide(w http.ResponseWriter, r *http.Request) {
-	var req service.RideRequest
+	var req model.RideRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
@@ -39,7 +40,7 @@ func (h *RideHandler) CancelRide(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req service.CancelRideRequest
+	var req model.CancelRideRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return

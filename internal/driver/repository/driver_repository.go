@@ -2,7 +2,7 @@ package repository
 
 import (
 	"context"
-	"ride-hail/internal/common/models"
+	"ride-hail/internal/common/model"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -16,10 +16,10 @@ func NewDriverRepository(db *pgx.Conn) *DriverRepository {
 	return &DriverRepository{db: db}
 }
 
-func (r *DriverRepository) SetOnline(ctx context.Context, driverID string, lat, lon float64) (models.OnlineResponse, error) {
+func (r *DriverRepository) SetOnline(ctx context.Context, driverID string, lat, lon float64) (model.OnlineResponse, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
-		return models.OnlineResponse{}, err
+		return model.OnlineResponse{}, err
 	}
 	defer tx.Rollback(ctx)
 
@@ -30,7 +30,7 @@ func (r *DriverRepository) SetOnline(ctx context.Context, driverID string, lat, 
 		RETURNING id
 	`, driverID).Scan(&sessionID)
 	if err != nil {
-		return models.OnlineResponse{}, err
+		return model.OnlineResponse{}, err
 	}
 
 	_, err = tx.Exec(ctx, `
@@ -39,7 +39,7 @@ func (r *DriverRepository) SetOnline(ctx context.Context, driverID string, lat, 
 		WHERE id = $1
 	`, driverID)
 	if err != nil {
-		return models.OnlineResponse{}, err
+		return model.OnlineResponse{}, err
 	}
 
 	_, err = tx.Exec(ctx, `
@@ -47,14 +47,14 @@ func (r *DriverRepository) SetOnline(ctx context.Context, driverID string, lat, 
 		VALUES ( $1, $2, $3)
 	`, driverID, lat, lon)
 	if err != nil {
-		return models.OnlineResponse{}, err
+		return model.OnlineResponse{}, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return models.OnlineResponse{}, err
+		return model.OnlineResponse{}, err
 	}
 
-	response := models.OnlineResponse{
+	response := model.OnlineResponse{
 		Status:    "AVAILABLE",
 		SessionID: sessionID,
 		Message:   "You are now online and ready to accept rides",
@@ -63,10 +63,10 @@ func (r *DriverRepository) SetOnline(ctx context.Context, driverID string, lat, 
 	return response, nil
 }
 
-func (r *DriverRepository) SetOffline(ctx context.Context, driverID string) (models.OfflineResponse, error) {
+func (r *DriverRepository) SetOffline(ctx context.Context, driverID string) (model.OfflineResponse, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
-		return models.OfflineResponse{}, err
+		return model.OfflineResponse{}, err
 	}
 	defer tx.Rollback(ctx)
 
@@ -83,7 +83,7 @@ func (r *DriverRepository) SetOffline(ctx context.Context, driverID string) (mod
 		LIMIT 1
 	`, driverID).Scan(&sessionID, &startedAt, &totalRides, &totalEarnings)
 	if err != nil {
-		return models.OfflineResponse{}, err
+		return model.OfflineResponse{}, err
 	}
 
 	_, err = tx.Exec(ctx, `
@@ -92,7 +92,7 @@ func (r *DriverRepository) SetOffline(ctx context.Context, driverID string) (mod
 		WHERE id = $1
 	`, sessionID)
 	if err != nil {
-		return models.OfflineResponse{}, err
+		return model.OfflineResponse{}, err
 	}
 
 	_, err = tx.Exec(ctx, `
@@ -101,19 +101,19 @@ func (r *DriverRepository) SetOffline(ctx context.Context, driverID string) (mod
 		WHERE id = $1
 	`, driverID)
 	if err != nil {
-		return models.OfflineResponse{}, err
+		return model.OfflineResponse{}, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return models.OfflineResponse{}, err
+		return model.OfflineResponse{}, err
 	}
 
 	durationHours := time.Since(startedAt).Hours()
 
-	response := models.OfflineResponse{
+	response := model.OfflineResponse{
 		Status:    "OFFLINE",
 		SessionID: sessionID,
-		SessionSummary: models.SessionSummary{
+		SessionSummary: model.SessionSummary{
 			DurationHours:  durationHours,
 			RidesCompleted: totalRides,
 			Earnings:       totalEarnings,
@@ -124,10 +124,10 @@ func (r *DriverRepository) SetOffline(ctx context.Context, driverID string) (mod
 	return response, nil
 }
 
-func (r *DriverRepository) Location(ctx context.Context, driverID string, req models.LocationRequest) (models.LocationResponse, error) {
+func (r *DriverRepository) Location(ctx context.Context, driverID string, req model.LocationRequest) (model.LocationResponse, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
-		return models.LocationResponse{}, err
+		return model.LocationResponse{}, err
 	}
 	defer tx.Rollback(ctx)
 
@@ -147,10 +147,10 @@ func (r *DriverRepository) Location(ctx context.Context, driverID string, req mo
 				RETURNING id
 			`, driverID, req.Latitude, req.Longitude).Scan(&coordinateID)
 			if err != nil {
-				return models.LocationResponse{}, err
+				return model.LocationResponse{}, err
 			}
 		} else {
-			return models.LocationResponse{}, err
+			return model.LocationResponse{}, err
 		}
 	} else {
 		_, err = tx.Exec(ctx, `
@@ -161,7 +161,7 @@ func (r *DriverRepository) Location(ctx context.Context, driverID string, req mo
 			WHERE id = $3
 		`, req.Latitude, req.Longitude, coordinateID)
 		if err != nil {
-			return models.LocationResponse{}, err
+			return model.LocationResponse{}, err
 		}
 	}
 
@@ -174,14 +174,14 @@ func (r *DriverRepository) Location(ctx context.Context, driverID string, req mo
 	`, coordinateID, driverID, req.Latitude, req.Longitude,
 		req.AccuracyMeters, req.SpeedKmh, req.HeadingDegrees)
 	if err != nil {
-		return models.LocationResponse{}, err
+		return model.LocationResponse{}, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return models.LocationResponse{}, err
+		return model.LocationResponse{}, err
 	}
 
-	resp := models.LocationResponse{
+	resp := model.LocationResponse{
 		CoordinateID: coordinateID,
 		UpdatedAt:    time.Now().UTC().Format(time.RFC3339),
 	}
@@ -189,8 +189,8 @@ func (r *DriverRepository) Location(ctx context.Context, driverID string, req mo
 	return resp, nil
 }
 
-func (r *DriverRepository) Start(ctx context.Context, driverID string, req models.StartRequest) (models.StartResponse, error) {
-	var resp models.StartResponse
+func (r *DriverRepository) Start(ctx context.Context, driverID string, req model.StartRequest) (model.StartResponse, error) {
+	var resp model.StartResponse
 	startedAt := time.Now().UTC().Format(time.RFC3339)
 
 	tx, err := r.db.Begin(ctx)
@@ -220,7 +220,7 @@ func (r *DriverRepository) Start(ctx context.Context, driverID string, req model
 		return resp, err
 	}
 
-	resp = models.StartResponse{
+	resp = model.StartResponse{
 		RideID:    req.RideID,
 		Status:    "IN_PROGRESS",
 		StartedAt: startedAt,
