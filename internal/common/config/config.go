@@ -73,6 +73,6 @@ func (c *Config) Print() {
 	fmt.Printf("📦 Database: %s@%s:%d/%s\n", c.Database.User, c.Database.Host, c.Database.Port, c.Database.Name)
 	fmt.Printf("🐇 RabbitMQ: amqp://%s:%s@%s:%d\n", c.RabbitMQ.User, c.RabbitMQ.Password, c.RabbitMQ.Host, c.RabbitMQ.Port)
 	fmt.Printf("🌐 WebSocket Port: %d\n", c.WebSocket.Port)
-	fmt.Printf("🧩 Services → ride:%d | driver:%d | admin:%d\n",
+	fmt.Printf("🧩 Services → driver:%d | driver:%d | admin:%d\n",
 		c.Services.RideServicePort, c.Services.DriverLocationServicePort, c.Services.AdminServicePort)
 }

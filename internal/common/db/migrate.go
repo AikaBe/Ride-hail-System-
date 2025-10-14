@@ -21,7 +21,7 @@ func (p *Postgres) RunMigrations(migrationsDir string) error {
 		return fmt.Errorf("failed to read migration files: %w", err)
 	}
 
-	tx, err := p.Pool.Begin(context.Background())
+	tx, err := p.Conn.Begin(context.Background())
 	if err != nil {
 		return fmt.Errorf("failed to start migration transaction: %w", err)
 	}

@@ -36,5 +36,6 @@ func main() {
 	}
 	defer rmq.Close()
 
-	cmdRide.Run(cfg, pg.Pool, rmq)
+	cmdRide.Run(cfg, pg.Conn, rmq)
+	//cmdDriver.DriverMain(cfg, pg.Conn)
 }
