@@ -15,7 +15,7 @@ type Postgres struct {
 
 func NewPostgres(host string, port int, user, password, database string) (*Postgres, error) {
 	dsn := fmt.Sprintf(
-		"postgres://%s:%s@%s:%d/%s",
+		"postgres://%s:%s@%s:%d/%s?sslmode=disable",
 		user, password, host, port, database,
 	)
 

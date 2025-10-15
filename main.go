@@ -2,8 +2,10 @@ package main
 
 import (
 	"log"
+	"net/http"
 	cmdDriver "ride-hail/cmd/driver-location-service"
 	cmdRide "ride-hail/cmd/ride-service"
+	"ride-hail/internal/common/auth"
 	"ride-hail/internal/common/config"
 	"ride-hail/internal/common/db"
 	"ride-hail/internal/common/mq"
@@ -36,6 +38,15 @@ func main() {
 		log.Fatalf("rabbitmq error: %v", err)
 	}
 	defer rmq.Close()
+
+	http.HandleFunc("/get-token", auth.GetTokenHandler())
+
+	go func() {
+		log.Println("HTTP server running on :8080")
+		if err := http.ListenAndServe(":8080", nil); err != nil {
+			log.Fatalf("HTTP server error: %v", err)
+		}
+	}()
 
 	cmdRide.Run(cfg, pg.Conn, rmq)
 	cmdDriver.DriverMain(cfg, pg.Conn)
