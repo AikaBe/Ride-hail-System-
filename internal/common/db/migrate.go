@@ -54,7 +54,7 @@ func readMigrationFiles(dir string) ([]string, error) {
 		if err != nil {
 			return err
 		}
-		if !d.IsDir() && strings.HasSuffix(d.Name(), ".up") {
+		if !d.IsDir() && (strings.HasSuffix(d.Name(), ".up.sql") || strings.HasSuffix(d.Name(), ".up")) {
 			files = append(files, path)
 		}
 		return nil

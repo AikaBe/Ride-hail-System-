@@ -51,6 +51,9 @@ ride-hail/
 │   │       └── consumer.go
 │   │
 │   ├── common/
+│   │   ├── auth/
+│   │   │   ├──jwt.go
+│   │   │   └──middleware.go
 │   │   ├── db/postgres.go
 │   │   ├── mq/connection.go
 │   │   ├── config/config.go

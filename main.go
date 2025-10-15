@@ -5,10 +5,10 @@ import (
 	"net/http"
 	cmdDriver "ride-hail/cmd/driver-location-service"
 	cmdRide "ride-hail/cmd/ride-service"
-	"ride-hail/internal/common/auth"
 	"ride-hail/internal/common/config"
 	"ride-hail/internal/common/db"
 	"ride-hail/internal/common/mq"
+	"ride-hail/internal/common/registration"
 )
 
 func main() {
@@ -39,11 +39,11 @@ func main() {
 	}
 	defer rmq.Close()
 
-	http.HandleFunc("/get-token", auth.GetTokenHandler())
+	http.HandleFunc("/register", registration.RegisterHandler(pg.Conn))
 
 	go func() {
-		log.Println("HTTP server running on :8080")
-		if err := http.ListenAndServe(":8080", nil); err != nil {
+		log.Println("HTTP server running on :8085")
+		if err := http.ListenAndServe(":8085", nil); err != nil {
 			log.Fatalf("HTTP server error: %v", err)
 		}
 	}()
