@@ -13,8 +13,8 @@ import (
 var jwtSecret = []byte("super-secret-key")
 
 type Claims struct {
-	UserID string `json:"sub"`  // ID пользователя
-	Role   string `json:"role"` // PASSENGER / DRIVER / ADMIN
+	UserID string `json:"sub"`
+	Role   string `json:"role"`
 	jwt.RegisteredClaims
 }
 

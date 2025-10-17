@@ -20,7 +20,8 @@ func DriverMain(cfg *config.Config, conn *pgx.Conn) {
 	mux.HandleFunc("POST /drivers/{driver_id}/online", h.GoOnline)
 	mux.HandleFunc("POST /drivers/{driver_id}/offline", h.GoOffline)
 	mux.HandleFunc("POST /drivers/{driver_id}/location", h.Location)
-	// mux.HandleFunc("POST /drivers/{driver_id}/start", h.Start)
+	mux.HandleFunc("POST /drivers/{driver_id}/start", h.Start)
+	mux.HandleFunc("POST /drivers/{driver_id}/complete", h.Complete)
 
 	serverAddr := ":8082"
 	log.Printf("Driver Status Service running on %s", serverAddr)

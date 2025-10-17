@@ -9,6 +9,7 @@ import (
 	"ride-hail/internal/common/db"
 	"ride-hail/internal/common/mq"
 	"ride-hail/internal/common/registration"
+	"ride-hail/internal/common/websocket"
 )
 
 func main() {
@@ -40,7 +41,15 @@ func main() {
 	defer rmq.Close()
 
 	http.HandleFunc("/register", registration.RegisterHandler(pg.Conn))
+	http.HandleFunc("/ws/passengers/", websocket.PassengerWSHandler)
+	http.HandleFunc("/ws/drivers/", websocket.DriverWSHandler)
 
+	go func() {
+		log.Println("🚀 WebSocket server running on ws://localhost:3001")
+		if err := http.ListenAndServe(":3001", nil); err != nil {
+			log.Fatalf("WebSocket server error: %v", err)
+		}
+	}()
 	go func() {
 		log.Println("HTTP server running on :8085")
 		if err := http.ListenAndServe(":8085", nil); err != nil {
@@ -48,6 +57,7 @@ func main() {
 		}
 	}()
 
-	cmdRide.Run(cfg, pg.Conn, rmq)
-	cmdDriver.DriverMain(cfg, pg.Conn)
+	go cmdRide.Run(cfg, pg.Conn, rmq)
+	go cmdDriver.DriverMain(cfg, pg.Conn)
+	select {}
 }

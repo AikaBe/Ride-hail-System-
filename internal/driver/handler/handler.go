@@ -5,15 +5,13 @@ import (
 	"encoding/json"
 	"net/http"
 	"ride-hail/internal/common/model"
-
-	"ride-hail/internal/driver/service"
 )
 
 type Handler struct {
-	service *service.DriverService
+	service DriverService
 }
 
-func NewHandler(s *service.DriverService) *Handler {
+func NewHandler(s DriverService) *Handler {
 	return &Handler{service: s}
 }
 
@@ -86,27 +84,52 @@ func (h *Handler) Location(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-//func (h *Handler) Start(w http.ResponseWriter, r *http.Request) {
-//	ctx := context.Background()
-//	driverID := r.PathValue("driver_id")
-//
-//	var req model.StartRequest
-//	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-//		http.Error(w, "invalid request", http.StatusBadRequest)
-//		return
-//	}
-//
-//	location := model.Location{
-//		Latitude:  req.DriverLocation.Latitude,
-//		Longitude: req.DriverLocation.Longitude,
-//	}
-//
-//	resp, err := h.service.Start(ctx, driverID, req.RideID, location)
-//	if err != nil {
-//		http.Error(w, err.Error(), http.StatusInternalServerError)
-//		return
-//	}
-//
-//	w.Header().Set("Content-Type", "application/json")
-//	json.NewEncoder(w).Encode(resp)
-//}
+func (h *Handler) Start(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
+	driverID := r.PathValue("driver_id")
+
+	var req model.StartRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	location := model.Location{
+		Latitude:  req.DriverLocation.Latitude,
+		Longitude: req.DriverLocation.Longitude,
+	}
+
+	resp, err := h.service.Start(ctx, driverID, req.RideID, location)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+func (h *Handler) Complete(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
+	driverID := r.PathValue("driver_id")
+
+	var req model.CompleteRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	location := model.Location{
+		Latitude:  req.FinalLocation.Latitude,
+		Longitude: req.FinalLocation.Longitude,
+	}
+
+	resp, err := h.service.Complete(ctx, driverID, req, location)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
