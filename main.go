@@ -7,8 +7,8 @@ import (
 	cmdRide "ride-hail/cmd/ride-service"
 	"ride-hail/internal/common/config"
 	"ride-hail/internal/common/db"
-	"ride-hail/internal/common/mq"
 	"ride-hail/internal/common/registration"
+	"ride-hail/internal/common/rmq"
 	"ride-hail/internal/common/websocket"
 )
 
@@ -31,7 +31,7 @@ func main() {
 		log.Fatalf("migration error: %v", err)
 	}
 
-	rmq, err := mq.NewRabbitMQ(
+	rmq, err := rmq.NewRabbitMQ(
 		cfg.RabbitMQ.Host, cfg.RabbitMQ.Port,
 		cfg.RabbitMQ.User, cfg.RabbitMQ.Password,
 	)

@@ -5,18 +5,18 @@ import (
 	"log"
 	"net/http"
 	"ride-hail/internal/common/config"
-	"ride-hail/internal/common/mq"
-	ridehttp "ride-hail/internal/ride/http"
+	"ride-hail/internal/common/rmq"
+	ridehttp "ride-hail/internal/ride/handler"
 	"ride-hail/internal/ride/repository"
 	"ride-hail/internal/ride/service"
 )
 
-func Run(cfg *config.Config, conn *pgx.Conn, mq *mq.RabbitMQ) {
+func Run(cfg *config.Config, conn *pgx.Conn, mq *rmq.RabbitMQ) {
 	log.Printf("✅ Ride Service running on port %d\n", cfg.Services.RideServicePort)
 
 	repo := repository.NewRideRepository(conn)
-	manager := service.NewRideManager(repo)
-	handler := ridehttp.NewRideHandler(manager)
+	service := service.NewRideManager(repo)
+	handler := ridehttp.NewRideHandler(service)
 
 	mux := http.NewServeMux()
 	ridehttp.SetupRoutes(mux, handler)

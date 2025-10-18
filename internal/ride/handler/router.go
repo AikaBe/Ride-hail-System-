@@ -1,4 +1,4 @@
-package http
+package handler
 
 import (
 	"encoding/json"
@@ -31,7 +31,7 @@ func SetupRoutes(mux *http.ServeMux, rideHandler *RideHandler) {
 				return
 			}
 
-			resp, err := rideHandler.RideManager.CancelRide(r.Context(), rideID, req.Reason)
+			resp, err := rideHandler.RideService.CancelRide(r.Context(), rideID, req.Reason)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return

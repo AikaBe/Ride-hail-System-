@@ -1,4 +1,4 @@
-package model
+package handler
 
 type RideRequest struct {
 	PassengerID          string  `json:"passenger_id"`
@@ -16,7 +16,7 @@ type RideResponse struct {
 	RideNumber               string  `json:"ride_number"`
 	Status                   string  `json:"status"`
 	EstimatedFare            float64 `json:"estimated_fare"`
-	EstimatedDurationMinutes float64 `json:"estimated_duration_minutes"`
+	EstimatedDurationMinutes int     `json:"estimated_duration_minutes"`
 	EstimatedDistanceKm      float64 `json:"estimated_distance_km"`
 }
 

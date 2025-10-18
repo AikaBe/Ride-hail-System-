@@ -1,8 +1,9 @@
-package mq
+package rmq
 
 import (
 	"fmt"
 	"log"
+	"math"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -31,17 +32,21 @@ func (r *RabbitMQ) connect() error {
 	for i := 1; i <= 5; i++ {
 		conn, err = amqp.Dial(r.URL)
 		if err == nil {
-			r.Conn = conn
-			r.Chan, err = conn.Channel()
-			if err != nil {
-				return fmt.Errorf("failed to open channel: %w", err)
+			ch, chErr := conn.Channel()
+			if chErr != nil {
+				_ = conn.Close()
+				return fmt.Errorf("failed to open channel: %w", chErr)
 			}
-			log.Println("✅ Connected to RabbitMQ")
+			r.Conn = conn
+			r.Chan = ch
+			log.Println("Connected to RabbitMQ")
 			return nil
 		}
-		log.Printf("⚠️ RabbitMQ reconnect attempt %d failed: %v", i, err)
-		time.Sleep(time.Duration(i) * 2 * time.Second)
+
+		log.Printf("RabbitMQ reconnect attempt %d failed: %v", i, err)
+		time.Sleep(time.Second * time.Duration(math.Pow(2, float64(i)))) // exponential backoff
 	}
+
 	return fmt.Errorf("failed to connect to RabbitMQ after retries: %w", err)
 }
 
@@ -52,5 +57,6 @@ func (r *RabbitMQ) Close() {
 	if r.Conn != nil {
 		_ = r.Conn.Close()
 	}
-	log.Println("🛑 RabbitMQ connection closed")
+	r.Conn, r.Chan = nil, nil
+	log.Println("RabbitMQ connection closed")
 }

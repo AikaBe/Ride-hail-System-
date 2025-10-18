@@ -38,7 +38,7 @@ insert into
     "ride_status" ("value")
 values
     ('REQUESTED'),   -- Ride has been requested by customer
-    ('MATCHED'),     -- Driver has been matched to the driver-service
+    ('MATCHED'),     -- Driver has been matched to the ride
     ('EN_ROUTE'),    -- Driver is on the way to pickup location
     ('ARRIVED'),     -- Driver has arrived at pickup location
     ('IN_PROGRESS'), -- Ride is currently in progress
@@ -51,8 +51,8 @@ create table "vehicle_type"("value" text not null primary key);
 insert into
     "vehicle_type" ("value")
 values
-    ('ECONOMY'),     -- Standard economy driver-service
-    ('PREMIUM'),     -- Premium comfort driver-service
+    ('ECONOMY'),     -- Standard economy ride
+    ('PREMIUM'),     -- Premium comfort ride
     ('XL')           -- Extra large vehicle for groups
 ;
 
@@ -108,18 +108,18 @@ create table "ride_event_type"("value" text not null primary key);
 insert into
     "ride_event_type" ("value")
 values
-    ('RIDE_REQUESTED'),    -- Initial driver-service request
-    ('DRIVER_MATCHED'),    -- Driver assigned to driver-service
+    ('RIDE_REQUESTED'),    -- Initial ride request
+    ('DRIVER_MATCHED'),    -- Driver assigned to ride
     ('DRIVER_ARRIVED'),    -- Driver arrived at pickup
     ('RIDE_STARTED'),      -- Ride began
     ('RIDE_COMPLETED'),    -- Ride finished
     ('RIDE_CANCELLED'),    -- Ride was cancelled
     ('STATUS_CHANGED'),    -- General status change
-    ('LOCATION_UPDATED'),  -- Location update during driver-service
+    ('LOCATION_UPDATED'),  -- Location update during ride
     ('FARE_ADJUSTED')      -- Fare was adjusted
 ;
 
--- Event sourcing table for complete driver-service audit trail
+-- Event sourcing table for complete ride audit trail
 create table ride_events (
                              id uuid primary key default gen_random_uuid(),
                              created_at timestamptz not null default now(),
