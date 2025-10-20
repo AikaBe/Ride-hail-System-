@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"ride-hail/internal/common/logger"
 	"ride-hail/internal/common/model"
 	"time"
 
@@ -21,8 +22,12 @@ func NewRideRepository(database *pgx.Conn) *RideRepository {
 func (r *RideRepository) BeginTx(ctx context.Context) (pgx.Tx, error) {
 	tx, err := r.DB.Begin(ctx)
 	if err != nil {
+		logger.Error("BeginTx", "failed to begin transaction", "", "", err.Error(), "")
+
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
+	logger.Info("BeginTx", "transaction started successfully", "", "")
+
 	return tx, nil
 }
 
@@ -57,12 +62,15 @@ func (r *RideRepository) InsertRide(ctx context.Context, tx pgx.Tx, ride model.R
 	var id string
 	var createdAt, updatedAt time.Time
 	if err := row.Scan(&id, &createdAt, &updatedAt); err != nil {
+		logger.Error("InsertRide", "failed to scan inserted ride", "", "", err.Error(), "")
+
 		return nil, fmt.Errorf("failed to scan inserted ride: %w", err)
 	}
 
 	ride.ID = model.UUID(id)
 	ride.CreatedAt = createdAt
 	ride.UpdatedAt = updatedAt
+	logger.Info("InsertRide", "ride inserted successfully", "", string(ride.ID))
 
 	return &ride, nil
 }
@@ -79,8 +87,11 @@ func (r *RideRepository) InsertRideEvent(ctx context.Context, tx pgx.Tx, event m
 
 	data, _ := json.Marshal(event.EventData)
 	if _, err := tx.Exec(ctx, query, event.RideID, event.EventType, data); err != nil {
+		logger.Error("InsertRideEvent", "failed to insert ride event", "", string(event.RideID), err.Error(), "")
+
 		return fmt.Errorf("failed to insert ride event: %w", err)
 	}
+	logger.Info("InsertRideEvent", "ride event inserted successfully", "", string(event.RideID))
 
 	return nil
 }
@@ -108,8 +119,11 @@ func (r *RideRepository) InsertCoordinate(ctx context.Context, tx pgx.Tx, coordi
 	).Scan(&id)
 
 	if err != nil {
+		logger.Error("InsertCoordinate", "failed to insert coordinate", "", string(coordinate.EntityID), err.Error(), "")
+
 		return "", fmt.Errorf("failed to insert coordinate: %w", err)
 	}
+	logger.Info("InsertCoordinate", "coordinate inserted successfully", "", id)
 
 	return id, nil
 }
@@ -124,6 +138,8 @@ type CancelRideResponse struct {
 func (r *RideRepository) CancelRide(ctx context.Context, rideID, reason string) (*CancelRideResponse, error) {
 	tx, err := r.DB.Begin(ctx)
 	if err != nil {
+		logger.Error("CancelRide", "failed to begin transaction", "", rideID, err.Error(), "")
+
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback(ctx)
@@ -139,8 +155,12 @@ func (r *RideRepository) CancelRide(ctx context.Context, rideID, reason string) 
 	err = tx.QueryRow(ctx, query, reason, rideID).Scan(&cancelledAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
+			logger.Warn("CancelRide", "ride not found or cannot be cancelled", "", rideID, "")
+
 			return nil, fmt.Errorf("ride not found or cannot be cancelled")
 		}
+		logger.Error("CancelRide", "failed to cancel ride", "", rideID, err.Error(), "")
+
 		return nil, fmt.Errorf("failed to cancel ride: %w", err)
 	}
 
@@ -151,12 +171,17 @@ func (r *RideRepository) CancelRide(ctx context.Context, rideID, reason string) 
 	`
 	_, err = tx.Exec(ctx, eventQuery, rideID, reason)
 	if err != nil {
+		logger.Error("CancelRide", "failed to insert cancellation event", "", rideID, err.Error(), "")
+
 		return nil, fmt.Errorf("failed to insert cancellation event: %w", err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
+		logger.Error("CancelRide", "failed to commit transaction", "", rideID, err.Error(), "")
+
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
+	logger.Info("CancelRide", "ride cancelled successfully", "", rideID)
 
 	return &CancelRideResponse{
 		RideID:      rideID,

@@ -2,9 +2,9 @@ package websocket
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"ride-hail/internal/common/auth"
+	"ride-hail/internal/common/logger"
 	"ride-hail/internal/common/model"
 	"time"
 
@@ -12,20 +12,22 @@ import (
 )
 
 func DriverWSHandler(w http.ResponseWriter, r *http.Request) {
+	requestID := r.Header.Get("X-Request-ID")
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
+		logger.Error("ws_upgrade_failed", "Failed to upgrade connection", requestID, "", err.Error(), "")
 		http.Error(w, "failed to upgrade", http.StatusInternalServerError)
 		return
 	}
 	defer conn.Close()
 
-	log.Println("Driver connected")
+	logger.Info("ws_driver_connected", "Driver connected", requestID, "")
 
 	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 
 	_, msg, err := conn.ReadMessage()
 	if err != nil {
-		log.Println("auth read error:", err)
+		logger.Error("ws_auth_read_failed", "Failed to read auth message", requestID, "", err.Error(), "")
 		conn.WriteMessage(websocket.TextMessage, []byte(`{"error":"auth_timeout"}`))
 		return
 	}
@@ -34,20 +36,22 @@ func DriverWSHandler(w http.ResponseWriter, r *http.Request) {
 	_ = json.Unmarshal(msg, &incoming)
 
 	if incoming.Type != "auth" {
+		logger.Warn("ws_invalid_auth_message", "Invalid auth message type", requestID, "", "")
 		conn.WriteMessage(websocket.TextMessage, []byte(`{"error":"invalid_auth_message"}`))
 		return
 	}
 
 	if _, err := auth.ValidateToken(incoming.Token); err != nil {
+		logger.Warn("ws_invalid_token", "Driver token invalid", requestID, "", err.Error())
 		conn.WriteMessage(websocket.TextMessage, []byte(`{"error":"invalid_token"}`))
 		return
 	}
 
 	conn.WriteMessage(websocket.TextMessage, []byte(`{"status":"authenticated"}`))
-	log.Println("Driver authenticated")
+	logger.Info("ws_driver_authenticated", "Driver successfully authenticated", requestID, "")
 
 	conn.SetPongHandler(func(appData string) error {
-		log.Println("Pong received from driver")
+		logger.Debug("ws_pong_received", "Pong received from driver", requestID, "")
 		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 		return nil
 	})
@@ -59,7 +63,7 @@ func DriverWSHandler(w http.ResponseWriter, r *http.Request) {
 		select {
 		case <-ticker.C:
 			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				log.Println("Ping failed:", err)
+				logger.Error("ws_ping_failed", "Ping to driver failed", requestID, "", err.Error(), "")
 				return
 			}
 
@@ -67,11 +71,11 @@ func DriverWSHandler(w http.ResponseWriter, r *http.Request) {
 			conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 			messageType, msg, err := conn.ReadMessage()
 			if err != nil {
-				log.Println("read error:", err)
+				logger.Error("ws_read_failed", "Failed to read driver message", requestID, "", err.Error(), "")
 				return
 			}
 
-			log.Printf("Driver says: %s", msg)
+			logger.Info("ws_driver_message", string(msg), requestID, "")
 			conn.WriteMessage(messageType, []byte("Server received: "+string(msg)))
 		}
 	}

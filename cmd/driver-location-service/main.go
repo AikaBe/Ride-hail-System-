@@ -1,9 +1,9 @@
 package driver_location_service
 
 import (
-	"log"
 	"net/http"
 	"ride-hail/internal/common/config"
+	"ride-hail/internal/common/logger"
 	"ride-hail/internal/driver/handler"
 	"ride-hail/internal/driver/repository"
 	"ride-hail/internal/driver/service"
@@ -24,9 +24,9 @@ func DriverMain(cfg *config.Config, conn *pgx.Conn) {
 	mux.HandleFunc("POST /drivers/{driver_id}/complete", h.Complete)
 
 	serverAddr := ":8082"
-	log.Printf("Driver Status Service running on %s", serverAddr)
+	logger.Info("service_started", "Driver Status Service running", "init-request", "")
 
 	if err := http.ListenAndServe(serverAddr, mux); err != nil {
-		log.Fatalf("driver-status-service failed: %v", err)
+		logger.Error("service_failed", "Driver Status Service failed to start", "init-request", "", err.Error(), "")
 	}
 }

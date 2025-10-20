@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"ride-hail/internal/common/logger"
 	"strings"
 	"time"
 
@@ -19,8 +20,12 @@ type Claims struct {
 }
 
 func GetTokenHandler() http.HandlerFunc {
+
 	return func(w http.ResponseWriter, r *http.Request) {
+		requestID := r.Header.Get("X-Request-ID")
+
 		if r.Method != http.MethodPost {
+			logger.Info("invalid_method", "Only POST allowed", requestID, "")
 			http.Error(w, "only POST method allowed", http.StatusMethodNotAllowed)
 			return
 		}
@@ -30,11 +35,13 @@ func GetTokenHandler() http.HandlerFunc {
 			Role   string `json:"role"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			logger.Error("decode_failed", "Failed to decode request body", requestID, "", err.Error(), "")
 			http.Error(w, "invalid request body", http.StatusBadRequest)
 			return
 		}
 
 		if req.UserID == "" {
+			logger.Info("missing_user_id", "user_id is required", requestID, "")
 			http.Error(w, "user_id is required", http.StatusBadRequest)
 			return
 		}
@@ -44,9 +51,11 @@ func GetTokenHandler() http.HandlerFunc {
 
 		token, err := GenerateToken(req.UserID, req.Role)
 		if err != nil {
+			logger.Error("token_generation_failed", "Failed to generate token", requestID, req.UserID, err.Error(), "")
 			http.Error(w, "failed to generate token", http.StatusInternalServerError)
 			return
 		}
+		logger.Info("token_generated", "Token successfully generated", requestID, req.UserID)
 
 		json.NewEncoder(w).Encode(map[string]string{
 			"token": token,
