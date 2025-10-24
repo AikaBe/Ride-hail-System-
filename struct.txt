@@ -58,6 +58,10 @@ ride-hail/
 │   │   ├── mq/connection.go
 │   │   ├── config/config.go
 │   │   ├── logger/logger.go
+│   │   ├── websocket/
+│   │   │   ├── client.go
+│   │   │   ├── hub.go
+│   │   │   └── handler.go
 │   │   ├── models/entities.go
 │   │   └── utils/id_generator.go
 │

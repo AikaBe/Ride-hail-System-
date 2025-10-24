@@ -1,17 +1,20 @@
 package rmq
 
-import "time"
+import (
+	"ride-hail/internal/common/model"
+	"time"
+)
 
 type RideRequestedMessage struct {
-	RideID              string   `json:"ride_id"`
-	RideNumber          string   `json:"ride_number"`
-	PickupLocation      Location `json:"pickup_location"`
-	DestinationLocation Location `json:"destination_location"`
-	RideType            string   `json:"ride_type"`
-	EstimatedFare       float64  `json:"estimated_fare"`
-	MaxDistanceKm       float64  `json:"max_distance_km"`
-	TimeoutSeconds      int      `json:"timeout_seconds"`
-	CorrelationID       string   `json:"correlation_id"`
+	RideID              string            `json:"ride_id"`
+	RideNumber          string            `json:"ride_number"`
+	PickupLocation      Location          `json:"pickup_location"`
+	DestinationLocation Location          `json:"destination_location"`
+	RideType            model.VehicleType `json:"ride_type"`
+	EstimatedFare       float64           `json:"estimated_fare"`
+	MaxDistanceKm       float64           `json:"max_distance_km"`
+	TimeoutSeconds      int               `json:"timeout_seconds"`
+	CorrelationID       string            `json:"correlation_id"`
 }
 
 type Location struct {
@@ -36,12 +39,14 @@ type LatLng struct {
 
 type DriverResponseMessage struct {
 	RideID                  string     `json:"ride_id"`
+	OfferID                 string     `json:"offer_id"`
 	DriverID                string     `json:"driver_id"`
 	Accepted                bool       `json:"accepted"`
 	EstimatedArrivalMinutes int        `json:"estimated_arrival_minutes"`
 	DriverLocation          LatLng     `json:"driver_location"`
 	DriverInfo              DriverInfo `json:"driver_info"`
 	EstimatedArrival        time.Time  `json:"estimated_arrival"`
+	RespondedAt             time.Time  `json:"responded_at"`
 }
 
 type DriverInfo struct {

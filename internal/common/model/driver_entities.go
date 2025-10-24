@@ -68,3 +68,11 @@ type CompleteResponse struct {
 	DriverEarning float64 `json:"driver_earning"`
 	Message       string  `json:"message"`
 }
+type DriverNearby struct {
+	ID        string  `json:"id"`
+	Email     string  `json:"email"`
+	Rating    float64 `json:"rating"`
+	Latitude  float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
+	Distance  float64 `json:"distance_km"`
+}

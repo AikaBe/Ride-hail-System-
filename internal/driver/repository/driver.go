@@ -17,6 +17,47 @@ func NewDriverRepository(db *pgx.Conn) *DriverRepository {
 	return &DriverRepository{db: db}
 }
 
+func (r *DriverRepository) FindNearbyDrivers(ctx context.Context, pickup model.Location, vehicleType string, radiusMeters float64) ([]model.DriverNearby, error) {
+	query := `
+		SELECT d.id, u.email, d.rating, c.latitude, c.longitude,
+		       ST_Distance(
+		         ST_MakePoint(c.longitude, c.latitude)::geography,
+		         ST_MakePoint($1, $2)::geography
+		       ) / 1000 AS distance_km
+		FROM drivers d
+		JOIN users u ON d.id = u.id
+		JOIN coordinates c ON c.entity_id = d.id
+		  AND c.entity_type = 'driver'
+		  AND c.is_current = true
+		WHERE d.status = 'AVAILABLE'
+		  AND d.vehicle_type = $3
+		  AND ST_DWithin(
+		        ST_MakePoint(c.longitude, c.latitude)::geography,
+		        ST_MakePoint($1, $2)::geography,
+		        $4
+		      )
+		ORDER BY distance_km, d.rating DESC
+		LIMIT 10;
+	`
+
+	rows, err := r.db.Query(ctx, query, pickup.Longitude, pickup.Latitude, vehicleType, radiusMeters)
+	if err != nil {
+		return nil, fmt.Errorf("query failed: %w", err)
+	}
+	defer rows.Close()
+
+	var drivers []model.DriverNearby
+	for rows.Next() {
+		var d model.DriverNearby
+		if err := rows.Scan(&d.ID, &d.Email, &d.Rating, &d.Latitude, &d.Longitude, &d.Distance); err != nil {
+			return nil, fmt.Errorf("scan error: %w", err)
+		}
+		drivers = append(drivers, d)
+	}
+
+	return drivers, nil
+}
+
 func (r *DriverRepository) SetOnline(ctx context.Context, driverID string, lat, lon float64) (model.OnlineResponse, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {

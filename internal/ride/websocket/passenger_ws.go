@@ -3,24 +3,18 @@ package websocket
 import (
 	"log"
 	"net/http"
-	"time"
-
 	"ride-hail/internal/common/auth"
 	commonws "ride-hail/internal/common/websocket"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
-
-type DriverWSMessage struct {
-	Type  string `json:"type"`
-	Token string `json:"token,omitempty"`
-}
 
 var Upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
-func DriverWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hub) {
+func PassengerWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hub) {
 	conn, err := Upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		http.Error(w, "WebSocket upgrade failed", http.StatusInternalServerError)

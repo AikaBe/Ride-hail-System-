@@ -5,12 +5,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/jackc/pgx/v5"
+	"log"
 	"math"
 	"ride-hail/internal/common/model"
+	common "ride-hail/internal/common/rmq"
+	"ride-hail/internal/common/websocket"
 	"ride-hail/internal/ride/repository"
-
+	rmqClient "ride-hail/internal/ride/rmq"
+	"strings"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 type RideRepository interface {
@@ -22,16 +27,45 @@ type RideRepository interface {
 	BeginTx(ctx context.Context) (pgx.Tx, error)
 }
 
-type EventPublisher interface {
-	PublishRideRequested(ctx context.Context, ride model.Ride, pickup model.Coordinate, destination model.Coordinate) error
-}
 type RideService struct {
-	repo RideRepository
-	mq   EventPublisher
+	repo  RideRepository
+	mq    *rmqClient.Client
+	wsHub *websocket.Hub
 }
 
-func NewRideManager(repo RideRepository, mq EventPublisher) *RideService {
-	return &RideService{repo: repo, mq: mq}
+func NewRideManager(repo RideRepository, mq *rmqClient.Client, wsHub *websocket.Hub) *RideService {
+	return &RideService{repo: repo, mq: mq, wsHub: wsHub}
+}
+
+func (s *RideService) ListenForRides(ctx context.Context, queueName string) {
+	err := s.mq.ConsumeDriverResponses(queueName, func(msg common.DriverResponseMessage) {
+		log.Printf("📨 Получен ответ от водителя %s по заказу %s (accepted=%v)",
+			msg.DriverID, msg.RideID, msg.Accepted)
+
+		// 🟢 Если водитель принял заказ
+		if msg.Accepted {
+
+			// Формируем сообщение пассажиру
+
+			data, _ := json.Marshal(msg)
+
+			// Отправляем всем пассажирам (или конкретному, если знаем ID)
+			for _, c := range s.wsHub.Clients {
+				if strings.HasPrefix(c.ID, "passenger_") { // условие, если ID формируется по типу
+					s.wsHub.SendToClient(c.ID, data)
+				}
+			}
+
+			log.Printf("✅ Отправлено обновление пассажирам о принятии поездки %s водителем %s", msg.RideID, msg.DriverID)
+		} else {
+			// 🟥 Если водитель отклонил
+			log.Printf("🚫 Водитель %s отклонил поездку %s", msg.DriverID, msg.RideID)
+		}
+	})
+
+	if err != nil {
+		log.Printf("Ошибка при чтении сообщений очереди %s: %v", queueName, err)
+	}
 }
 
 func (s *RideService) CreateRide(ctx context.Context, ride model.Ride, pickup, destination model.Coordinate) (*model.Ride, float64, int, error) {
@@ -135,7 +169,26 @@ func (s *RideService) CreateRide(ctx context.Context, ride model.Ride, pickup, d
 		return nil, 0, 0, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	if err := s.mq.PublishRideRequested(ctx, ride, pickup, destination); err != nil {
+	message := common.RideRequestedMessage{
+		RideID:     string(ride.ID),
+		RideNumber: rideNumber,
+		PickupLocation: common.Location{
+			Lat:     pickup.Latitude,
+			Lng:     pickup.Longitude,
+			Address: pickup.Address,
+		},
+		DestinationLocation: common.Location{
+			Lat:     destination.Latitude,
+			Lng:     destination.Longitude,
+			Address: destination.Address,
+		},
+		RideType:       *ride.VehicleType,
+		MaxDistanceKm:  distanceKm,
+		TimeoutSeconds: 30,
+		CorrelationID:  string(ride.ID),
+	}
+
+	if err := s.mq.PublishRideRequested(ctx, message); err != nil {
 		fmt.Printf("WARN: failed to publish ride.request event: %v\n", err)
 	}
 
