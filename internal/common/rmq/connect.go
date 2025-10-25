@@ -2,8 +2,8 @@ package rmq
 
 import (
 	"fmt"
-	"log"
 	"math"
+	"ride-hail/internal/common/logger"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -35,15 +35,16 @@ func (r *RabbitMQ) connect() error {
 			ch, chErr := conn.Channel()
 			if chErr != nil {
 				_ = conn.Close()
+				logger.Error("rmq_channel_failed", "Failed to open channel", "", "", chErr.Error(), "")
 				return fmt.Errorf("failed to open channel: %w", chErr)
 			}
 			r.Conn = conn
 			r.Chan = ch
-			log.Println("Connected to RabbitMQ")
+			logger.Info("rmq_connected", "Connected to RabbitMQ", "", "")
 			return nil
 		}
 
-		log.Printf("RabbitMQ reconnect attempt %d failed: %v", i, err)
+		logger.Warn("rmq_reconnect_attempt", fmt.Sprintf("Reconnect attempt %d failed", i), "", "", err.Error(), "")
 		time.Sleep(time.Second * time.Duration(math.Pow(2, float64(i)))) // exponential backoff
 	}
 
@@ -58,5 +59,5 @@ func (r *RabbitMQ) Close() {
 		_ = r.Conn.Close()
 	}
 	r.Conn, r.Chan = nil, nil
-	log.Println("RabbitMQ connection closed")
+	logger.Info("rmq_connection_closed", "RabbitMQ connection closed", "", "")
 }

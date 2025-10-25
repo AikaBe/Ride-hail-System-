@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
-	"log"
 	"os"
 	"path/filepath"
+	"ride-hail/internal/common/logger"
 	"sort"
 	"strings"
 	"time"
@@ -14,15 +14,17 @@ import (
 
 func (p *Postgres) RunMigrations(migrationsDir string) error {
 	start := time.Now()
-	log.Println("🚀 Running database migrations...")
+	logger.Info("db_migrations_start", "Running database migrations...", "", "")
 
 	files, err := readMigrationFiles(migrationsDir)
 	if err != nil {
+		logger.Error("db_migrations_read_failed", "Failed to read migration files", "", "", err.Error(), "")
 		return fmt.Errorf("failed to read migration files: %w", err)
 	}
 
 	tx, err := p.Conn.Begin(context.Background())
 	if err != nil {
+		logger.Error("db_migrations_tx_failed", "Failed to start migration transaction", "", "", err.Error(), "")
 		return fmt.Errorf("failed to start migration transaction: %w", err)
 	}
 	defer tx.Rollback(context.Background())
@@ -30,20 +32,23 @@ func (p *Postgres) RunMigrations(migrationsDir string) error {
 	for _, file := range files {
 		content, err := os.ReadFile(file)
 		if err != nil {
+			logger.Error("db_migration_read_file_failed", fmt.Sprintf("Failed to read migration file %s", file), "", "", err.Error(), "")
 			return fmt.Errorf("failed to read migration file %s: %w", file, err)
 		}
 
-		log.Printf("📦 Applying migration: %s", filepath.Base(file))
+		logger.Info("db_migration_apply", fmt.Sprintf("Applying migration: %s", filepath.Base(file)), "", "")
 		if _, err := tx.Exec(context.Background(), string(content)); err != nil {
+			logger.Error("db_migration_failed", fmt.Sprintf("Migration %s failed", file), "", "", err.Error(), "")
 			return fmt.Errorf("migration %s failed: %w", file, err)
 		}
 	}
 
 	if err := tx.Commit(context.Background()); err != nil {
+		logger.Error("db_migrations_commit_failed", "Failed to commit migrations", "", "", err.Error(), "")
 		return fmt.Errorf("failed to commit migrations: %w", err)
 	}
 
-	log.Printf("✅ Migrations applied successfully in %v", time.Since(start))
+	logger.Info("db_migrations_done", fmt.Sprintf("Migrations applied successfully in %v", time.Since(start)), "", "")
 	return nil
 }
 
