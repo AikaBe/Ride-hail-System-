@@ -4,36 +4,31 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"ride-hail/internal/common/model"
+	"ride-hail/internal/common/uuid"
+	"ride-hail/internal/driver/handler/dto"
+	"ride-hail/internal/driver/model"
+	"ride-hail/internal/driver/service"
 )
 
-type DriverService interface {
-	GoOnline(ctx context.Context, driverID string, lat, lon float64) (model.OnlineResponse, error)
-	GoOffline(ctx context.Context, driverID string) (model.OfflineResponse, error)
-	Location(ctx context.Context, driverID string, req model.LocationRequest) (model.LocationResponse, error)
-	Start(ctx context.Context, driverID string, rideId string, location model.Location) (model.StartResponse, error)
-	Complete(ctx context.Context, driverID string, req model.CompleteRequest, location model.Location) (model.CompleteResponse, error)
+type DriverHandler struct {
+	service *service.DriverService
 }
 
-type Handler struct {
-	service DriverService
+func NewHandler(s *service.DriverService) *DriverHandler {
+	return &DriverHandler{service: s}
 }
 
-func NewHandler(s DriverService) *Handler {
-	return &Handler{service: s}
-}
-
-func (h *Handler) GoOnline(w http.ResponseWriter, r *http.Request) {
+func (h *DriverHandler) GoOnline(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	driverID := r.PathValue("driver_id")
 
-	var req model.OnlineRequest
+	var req dto.OnlineRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	}
 
-	resp, err := h.service.GoOnline(ctx, driverID, req.Latitude, req.Longitude)
+	driverSession, err := h.service.GoOnline(ctx, uuid.UUID(driverID), req.Latitude, req.Longitude)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -42,17 +37,23 @@ func (h *Handler) GoOnline(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
+	resp := dto.OnlineResponse{
+		Status:    model.DriverStatusAvailable,
+		SessionID: string(driverSession.ID),
+		Message:   "You are now online and ready to accept rides",
+	}
+
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		http.Error(w, "failed to encode response", http.StatusInternalServerError)
 		return
 	}
 }
 
-func (h *Handler) GoOffline(w http.ResponseWriter, r *http.Request) {
+func (h *DriverHandler) GoOffline(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	driverID := r.PathValue("driver_id")
 
-	resp, err := h.service.GoOffline(ctx, driverID)
+	session, durationHours, err := h.service.GoOffline(ctx, uuid.UUID(driverID))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -61,23 +62,43 @@ func (h *Handler) GoOffline(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
+	resp := dto.OfflineResponse{
+		Status:    "OFFLINE",
+		SessionID: string(session.ID),
+		SessionSummary: dto.SessionSummary{
+			DurationHours:  durationHours,
+			RidesCompleted: session.TotalRides,
+			Earnings:       session.TotalEarnings,
+		},
+		Message: "You are now offline",
+	}
+
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		http.Error(w, "failed to encode response", http.StatusInternalServerError)
 		return
 	}
 }
 
-func (h *Handler) Location(w http.ResponseWriter, r *http.Request) {
+func (h *DriverHandler) Location(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	driverID := r.PathValue("driver_id")
 
-	var req model.LocationRequest
+	var req dto.LocationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	}
 
-	resp, err := h.service.Location(ctx, driverID, req)
+	location := model.LocationHistory{
+		DriverID:       uuid.UUID(driverID),
+		Latitude:       req.Latitude,
+		Longitude:      req.Longitude,
+		AccuracyMeters: req.AccuracyMeters,
+		SpeedKmh:       req.SpeedKmh,
+		HeadingDegrees: req.HeadingDegrees,
+	}
+
+	resp, err := h.service.Location(ctx, location)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -92,11 +113,11 @@ func (h *Handler) Location(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Handler) Start(w http.ResponseWriter, r *http.Request) {
+func (h *DriverHandler) Start(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	driverID := r.PathValue("driver_id")
 
-	var req model.StartRequest
+	var req dto.StartRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
@@ -107,7 +128,7 @@ func (h *Handler) Start(w http.ResponseWriter, r *http.Request) {
 		Longitude: req.DriverLocation.Longitude,
 	}
 
-	resp, err := h.service.Start(ctx, driverID, req.RideID, location)
+	resp, err := h.service.Start(ctx, uuid.UUID(driverID), uuid.UUID(req.RideID), location)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -117,22 +138,17 @@ func (h *Handler) Start(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-func (h *Handler) Complete(w http.ResponseWriter, r *http.Request) {
+func (h *DriverHandler) Complete(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	driverID := r.PathValue("driver_id")
 
-	var req model.CompleteRequest
+	var req dto.CompleteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	}
 
-	location := model.Location{
-		Latitude:  req.FinalLocation.Latitude,
-		Longitude: req.FinalLocation.Longitude,
-	}
-
-	resp, err := h.service.Complete(ctx, driverID, req, location)
+	resp, err := h.service.Complete(ctx, uuid.UUID(driverID), req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

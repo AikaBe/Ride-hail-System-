@@ -3,7 +3,8 @@ package service
 import (
 	"fmt"
 	"math"
-	"ride-hail/internal/common/model"
+	"ride-hail/internal/ride/model"
+	usermodel "ride-hail/internal/user/model"
 )
 
 func (s *RideService) validateRideRequest(ride model.Ride) error {
@@ -16,7 +17,7 @@ func (s *RideService) validateRideRequest(ride model.Ride) error {
 	}
 
 	switch *ride.VehicleType {
-	case model.VehicleEconomy, model.VehiclePremium, model.VehicleXL:
+	case usermodel.VehicleEconomy, usermodel.VehiclePremium, usermodel.VehicleXL:
 	default:
 		return fmt.Errorf("invalid vehicle_type: %s", *ride.VehicleType)
 	}
@@ -47,10 +48,10 @@ func (s *RideService) validateCoordinates(pickup, destination model.Coordinate) 
 		return fmt.Errorf("destination address is too short")
 	}
 
-	if pickup.EntityType != "" && pickup.EntityType != model.EntityTypePassenger {
+	if pickup.EntityType != "" && pickup.EntityType != usermodel.EntityTypePassenger {
 		return fmt.Errorf("pickup.entity_type must be 'passenger'")
 	}
-	if destination.EntityType != "" && destination.EntityType != model.EntityTypePassenger {
+	if destination.EntityType != "" && destination.EntityType != usermodel.EntityTypePassenger {
 		return fmt.Errorf("destination.entity_type must be 'passenger'")
 	}
 

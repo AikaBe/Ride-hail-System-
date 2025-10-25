@@ -1,28 +1,5 @@
 package model
 
-type EntityType string
-
-const (
-	EntityTypeDriver    EntityType = "driver"
-	EntityTypePassenger EntityType = "passenger"
-)
-
-type Role string
-
-const (
-	RolePassenger Role = "PASSENGER"
-	RoleDriver    Role = "DRIVER"
-	RoleAdmin     Role = "ADMIN"
-)
-
-type UserStatus string
-
-const (
-	UserActive   UserStatus = "ACTIVE"
-	UserInactive UserStatus = "INACTIVE"
-	UserBanned   UserStatus = "BANNED"
-)
-
 type RideStatus string
 
 const (
@@ -33,14 +10,6 @@ const (
 	RideInProgress RideStatus = "IN_PROGRESS"
 	RideCompleted  RideStatus = "COMPLETED"
 	RideCancelled  RideStatus = "CANCELLED"
-)
-
-type VehicleType string
-
-const (
-	VehicleEconomy VehicleType = "ECONOMY"
-	VehiclePremium VehicleType = "PREMIUM"
-	VehicleXL      VehicleType = "XL"
 )
 
 type RideEventType string

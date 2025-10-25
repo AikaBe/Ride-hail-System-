@@ -2,10 +2,12 @@ package handler
 
 import (
 	"fmt"
-	"ride-hail/internal/common/model"
+	"ride-hail/internal/ride/model"
+	usermodel "ride-hail/internal/user/model"
+	"ride-hail/pkg/uuid"
 )
 
-// MapRideRequestToEntities maps raw HTTP request data into domain entities.
+// MapRideRequestToEntities maps raw HTTP request data into domain uuid.
 // Performs only syntactic validation (field presence, coordinate ranges).
 // Does NOT fill domain-specific fields like RideNumber, RequestedAt, or Status.
 func MapRideRequestToEntities(req RideRequest) (model.Ride, model.Coordinate, model.Coordinate, error) {
@@ -23,23 +25,23 @@ func MapRideRequestToEntities(req RideRequest) (model.Ride, model.Coordinate, mo
 	}
 
 	pickup := model.Coordinate{
-		EntityID:  model.UUID(req.PassengerID),
+		EntityID:  uuid.UUID(req.PassengerID),
 		Address:   req.PickupAddress,
 		Latitude:  req.PickupLatitude,
 		Longitude: req.PickupLongitude,
 	}
 
 	destination := model.Coordinate{
-		EntityID:  model.UUID(req.PassengerID),
+		EntityID:  uuid.UUID(req.PassengerID),
 		Address:   req.DestinationAddress,
 		Latitude:  req.DestinationLatitude,
 		Longitude: req.DestinationLongitude,
 	}
 
-	vehicleType := model.VehicleType(req.RideType)
+	vehicleType := usermodel.VehicleType(req.RideType)
 
 	ride := model.Ride{
-		PassengerID: model.UUID(req.PassengerID),
+		PassengerID: uuid.UUID(req.PassengerID),
 		VehicleType: &vehicleType,
 	}
 

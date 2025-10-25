@@ -4,7 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"ride-hail/internal/common/model"
+	"ride-hail/internal/ride/model"
+	"ride-hail/pkg/uuid"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -60,7 +61,7 @@ func (r *RideRepository) InsertRide(ctx context.Context, tx pgx.Tx, ride model.R
 		return nil, fmt.Errorf("failed to scan inserted ride: %w", err)
 	}
 
-	ride.ID = model.UUID(id)
+	ride.ID = uuid.UUID(id)
 	ride.CreatedAt = createdAt
 	ride.UpdatedAt = updatedAt
 

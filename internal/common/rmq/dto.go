@@ -1,7 +1,7 @@
 package rmq
 
 import (
-	"ride-hail/internal/common/model"
+	"ride-hail/internal/ride/model"
 	"time"
 )
 
@@ -57,7 +57,7 @@ type DriverInfo struct {
 
 type Vehicle struct {
 	Make  string `json:"make"`
-	Model string `json:"model"`
+	Model string `json:"uuid"`
 	Color string `json:"color"`
 	Plate string `json:"plate"`
 }

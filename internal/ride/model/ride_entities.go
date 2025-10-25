@@ -2,25 +2,15 @@ package model
 
 import (
 	"encoding/json"
+	"ride-hail/internal/common/uuid"
 	"time"
 )
 
-type User struct {
-	ID           UUID            `json:"id" db:"id"`
-	CreatedAt    time.Time       `json:"created_at" db:"created_at"`
-	UpdatedAt    time.Time       `json:"updated_at" db:"updated_at"`
-	Email        string          `json:"email" db:"email"`
-	Role         Role            `json:"role" db:"role"`
-	Status       UserStatus      `json:"status" db:"status"`
-	PasswordHash string          `json:"password_hash" db:"password_hash"`
-	Attrs        json.RawMessage `json:"attrs" db:"attrs"`
-}
-
 type Coordinate struct {
-	ID             UUID       `json:"id" db:"id"`
+	ID             uuid.UUID  `json:"id" db:"id"`
 	CreatedAt      time.Time  `json:"created_at" db:"created_at"`
 	UpdatedAt      time.Time  `json:"updated_at" db:"updated_at"`
-	EntityID       UUID       `json:"entity_id" db:"entity_id"`
+	EntityID       uuid.UUID  `json:"entity_id" db:"entity_id"`
 	EntityType     EntityType `json:"entity_type" db:"entity_type"`
 	Address        string     `json:"address" db:"address"`
 	Latitude       float64    `json:"latitude" db:"latitude"`
@@ -32,12 +22,12 @@ type Coordinate struct {
 }
 
 type Ride struct {
-	ID                      UUID         `json:"id" db:"id"`
+	ID                      uuid.UUID    `json:"id" db:"id"`
 	CreatedAt               time.Time    `json:"created_at" db:"created_at"`
 	UpdatedAt               time.Time    `json:"updated_at" db:"updated_at"`
 	RideNumber              string       `json:"ride_number" db:"ride_number"`
-	PassengerID             UUID         `json:"passenger_id" db:"passenger_id"`
-	DriverID                *UUID        `json:"driver_id,omitempty" db:"driver_id"`
+	PassengerID             uuid.UUID    `json:"passenger_id" db:"passenger_id"`
+	DriverID                *uuid.UUID   `json:"driver_id,omitempty" db:"driver_id"`
 	VehicleType             *VehicleType `json:"vehicle_type,omitempty" db:"vehicle_type"`
 	Status                  *RideStatus  `json:"status,omitempty" db:"status"`
 	Priority                int          `json:"priority" db:"priority"`
@@ -50,12 +40,12 @@ type Ride struct {
 	CancellationReason      *string      `json:"cancellation_reason,omitempty" db:"cancellation_reason"`
 	EstimatedFare           *float64     `json:"estimated_fare,omitempty" db:"estimated_fare"`
 	FinalFare               *float64     `json:"final_fare,omitempty" db:"final_fare"`
-	PickupCoordinateID      *UUID        `json:"pickup_coordinate_id,omitempty" db:"pickup_coordinate_id"`
-	DestinationCoordinateID *UUID        `json:"destination_coordinate_id,omitempty" db:"destination_coordinate_id"`
+	PickupCoordinateID      *uuid.UUID   `json:"pickup_coordinate_id,omitempty" db:"pickup_coordinate_id"`
+	DestinationCoordinateID *uuid.UUID   `json:"destination_coordinate_id,omitempty" db:"destination_coordinate_id"`
 }
 
 type RideEvent struct {
-	ID        UUID            `json:"id" db:"id"`
+	ID        uuid.UUID       `json:"id" db:"id"`
 	CreatedAt time.Time       `json:"created_at" db:"created_at"`
 	RideID    string          `json:"ride_id" db:"ride_id"`
 	EventType RideEventType   `json:"event_type" db:"event_type"`

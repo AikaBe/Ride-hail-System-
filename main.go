@@ -7,8 +7,8 @@ import (
 	cmdRide "ride-hail/cmd/ride-service"
 	"ride-hail/internal/common/config"
 	"ride-hail/internal/common/db"
-	"ride-hail/internal/common/registration"
 	"ride-hail/internal/common/rmq"
+	"ride-hail/internal/user/handler"
 )
 
 func main() {
@@ -39,7 +39,7 @@ func main() {
 	}
 	defer rmq.Close()
 
-	http.HandleFunc("/register", registration.RegisterHandler(pg.Conn))
+	http.HandleFunc("/register", handler.RegisterHandler(pg.Conn))
 
 	go func() {
 		log.Println("WebSocket server running on ws://localhost:3001")

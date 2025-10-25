@@ -34,7 +34,7 @@ func PassengerWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hu
 		Token string `json:"token"`
 	}
 	if err := conn.ReadJSON(&authMsg); err != nil {
-		log.Printf("passenger WS auth read error: %v", err)
+		log.Printf("passenger WS user read error: %v", err)
 		conn.Close()
 		return
 	}

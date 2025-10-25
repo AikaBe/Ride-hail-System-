@@ -3,7 +3,9 @@ package repository
 import (
 	"context"
 	"fmt"
-	"ride-hail/internal/common/model"
+	"ride-hail/internal/common/uuid"
+	"ride-hail/internal/driver/model"
+	ridemodel "ride-hail/internal/ride/model"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -17,7 +19,7 @@ func NewDriverRepository(db *pgx.Conn) *DriverRepository {
 	return &DriverRepository{db: db}
 }
 
-func (r *DriverRepository) FindNearbyDrivers(ctx context.Context, pickup model.Location, vehicleType string, radiusMeters float64) ([]model.DriverNearby, error) {
+func (r *DriverRepository) FindNearbyDrivers(ctx context.Context, pickup model.Location, vehicleType ridemodel.VehicleType, radiusMeters float64) ([]model.DriverNearby, error) {
 	query := `
 		SELECT d.id, u.email, d.rating, c.latitude, c.longitude,
 		       ST_Distance(
@@ -58,21 +60,21 @@ func (r *DriverRepository) FindNearbyDrivers(ctx context.Context, pickup model.L
 	return drivers, nil
 }
 
-func (r *DriverRepository) SetOnline(ctx context.Context, driverID string, lat, lon float64) (model.OnlineResponse, error) {
+func (r *DriverRepository) SetOnline(ctx context.Context, driverID uuid.UUID, lat, lon float64) (model.DriverSession, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
-		return model.OnlineResponse{}, err
+		return model.DriverSession{}, err
 	}
 	defer tx.Rollback(ctx)
 
-	var sessionID string
+	var session model.DriverSession
 	err = tx.QueryRow(ctx, `
 		INSERT INTO driver_sessions (driver_id,started_at)
 		VALUES ($1,now())
 		RETURNING id
-	`, driverID).Scan(&sessionID)
+	`, driverID).Scan(&session.ID, &session.DriverID, &session.StartedAt)
 	if err != nil {
-		return model.OnlineResponse{}, err
+		return model.DriverSession{}, err
 	}
 
 	_, err = tx.Exec(ctx, `
@@ -81,7 +83,7 @@ func (r *DriverRepository) SetOnline(ctx context.Context, driverID string, lat, 
 		WHERE id = $1
 	`, driverID)
 	if err != nil {
-		return model.OnlineResponse{}, err
+		return model.DriverSession{}, err
 	}
 
 	_, err = tx.Exec(ctx, `
@@ -89,52 +91,42 @@ func (r *DriverRepository) SetOnline(ctx context.Context, driverID string, lat, 
 		VALUES ( $1, $2, $3)
 	`, driverID, lat, lon)
 	if err != nil {
-		return model.OnlineResponse{}, err
+		return model.DriverSession{}, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return model.OnlineResponse{}, err
+		return model.DriverSession{}, err
 	}
 
-	response := model.OnlineResponse{
-		Status:    "AVAILABLE",
-		SessionID: sessionID,
-		Message:   "You are now online and ready to accept rides",
-	}
-
-	return response, nil
+	return session, nil
 }
 
-func (r *DriverRepository) SetOffline(ctx context.Context, driverID string) (model.OfflineResponse, error) {
+func (r *DriverRepository) SetOffline(ctx context.Context, driverID uuid.UUID) (model.DriverSession, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
-		return model.OfflineResponse{}, err
+		return model.DriverSession{}, err
 	}
 	defer tx.Rollback(ctx)
 
-	var sessionID string
-	var startedAt time.Time
-	var totalRides float64
-	var totalEarnings float64
-
+	var session model.DriverSession
 	err = tx.QueryRow(ctx, `
 		SELECT id, started_at, total_rides, total_earnings
 		FROM driver_sessions
 		WHERE driver_id = $1 AND ended_at IS NULL
 		ORDER BY started_at DESC
 		LIMIT 1
-	`, driverID).Scan(&sessionID, &startedAt, &totalRides, &totalEarnings)
+	`, driverID).Scan(&session.ID, &session.DriverID, &session.StartedAt, &session.TotalRides, &session.TotalEarnings)
 	if err != nil {
-		return model.OfflineResponse{}, err
+		return model.DriverSession{}, err
 	}
 
 	_, err = tx.Exec(ctx, `
 		UPDATE driver_sessions
 		SET ended_at = now()
 		WHERE id = $1
-	`, sessionID)
+	`, session.ID)
 	if err != nil {
-		return model.OfflineResponse{}, err
+		return model.DriverSession{}, err
 	}
 
 	_, err = tx.Exec(ctx, `
@@ -143,166 +135,159 @@ func (r *DriverRepository) SetOffline(ctx context.Context, driverID string) (mod
 		WHERE id = $1
 	`, driverID)
 	if err != nil {
-		return model.OfflineResponse{}, err
+		return model.DriverSession{}, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return model.OfflineResponse{}, err
+		return model.DriverSession{}, err
 	}
 
-	durationHours := time.Since(startedAt).Hours()
+	endedAt := time.Now()
+	session.EndedAt = &endedAt
 
-	response := model.OfflineResponse{
-		Status:    "OFFLINE",
-		SessionID: sessionID,
-		SessionSummary: model.SessionSummary{
-			DurationHours:  durationHours,
-			RidesCompleted: totalRides,
-			Earnings:       totalEarnings,
-		},
-		Message: "You are now offline",
-	}
-
-	return response, nil
+	return session, nil
 }
 
-func (r *DriverRepository) Location(ctx context.Context, driverID string, req model.LocationRequest) (model.LocationResponse, error) {
+func (r *DriverRepository) Location(ctx context.Context, location model.LocationHistory) (ridemodel.Coordinate, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
-		return model.LocationResponse{}, err
+		return ridemodel.Coordinate{}, err
 	}
 	defer tx.Rollback(ctx)
 
-	var coordinateID string
+	var coord ridemodel.Coordinate
 
 	err = tx.QueryRow(ctx, `
-		SELECT id FROM coordinates
-		WHERE entity_id = $1 AND entity_type = 'driver' AND is_current = true
-		LIMIT 1
-	`, driverID).Scan(&coordinateID)
+        SELECT id, entity_id, entity_type, address, latitude, longitude, is_current, created_at, updated_at
+        FROM coordinates
+        WHERE entity_id = $1 AND entity_type = 'driver' AND is_current = true
+        LIMIT 1
+    `, location.DriverID).Scan(
+		&coord.ID, &coord.EntityID, &coord.EntityType, &coord.Address,
+		&coord.Latitude, &coord.Longitude, &coord.IsCurrent,
+		&coord.CreatedAt, &coord.UpdatedAt,
+	)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			err = tx.QueryRow(ctx, `
-				INSERT INTO coordinates (entity_id, entity_type, address, latitude, longitude, is_current)
-				VALUES ($1, 'driver', 'Unknown', $2, $3, true)
-				RETURNING id
-			`, driverID, req.Latitude, req.Longitude).Scan(&coordinateID)
+                INSERT INTO coordinates (entity_id, entity_type, address, latitude, longitude, is_current)
+                VALUES ($1, 'driver', 'Unknown', $2, $3, true)
+                RETURNING id, entity_id, entity_type, address, latitude, longitude, is_current, created_at, updated_at
+            `, location.DriverID, location.Latitude, location.Longitude).Scan(
+				&coord.ID, &coord.EntityID, &coord.EntityType, &coord.Address,
+				&coord.Latitude, &coord.Longitude, &coord.IsCurrent,
+				&coord.CreatedAt, &coord.UpdatedAt,
+			)
 			if err != nil {
-				return model.LocationResponse{}, err
+				return ridemodel.Coordinate{}, err
 			}
 		} else {
-			return model.LocationResponse{}, err
+			return ridemodel.Coordinate{}, err
 		}
 	} else {
-		_, err = tx.Exec(ctx, `
-			UPDATE coordinates
-			SET latitude = $1,
-				longitude = $2,
-				updated_at = now()
-			WHERE id = $3
-		`, req.Latitude, req.Longitude, coordinateID)
+		err = tx.QueryRow(ctx, `
+            UPDATE coordinates
+            SET latitude = $1,
+                longitude = $2,
+                updated_at = now()
+            WHERE id = $3
+            RETURNING id, entity_id, entity_type, address, latitude, longitude, is_current, created_at, updated_at
+        `, location.Latitude, location.Longitude, coord.ID).Scan(
+			&coord.ID, &coord.EntityID, &coord.EntityType, &coord.Address,
+			&coord.Latitude, &coord.Longitude, &coord.IsCurrent,
+			&coord.CreatedAt, &coord.UpdatedAt,
+		)
 		if err != nil {
-			return model.LocationResponse{}, err
+			return ridemodel.Coordinate{}, err
 		}
 	}
 
 	_, err = tx.Exec(ctx, `
-		INSERT INTO location_history (
-			coordinate_id, driver_id, latitude, longitude,
-			accuracy_meters, speed_kmh, heading_degrees
-		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-	`, coordinateID, driverID, req.Latitude, req.Longitude,
-		req.AccuracyMeters, req.SpeedKmh, req.HeadingDegrees)
+        INSERT INTO location_history (
+            coordinate_id, driver_id, latitude, longitude,
+            accuracy_meters, speed_kmh, heading_degrees
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `, coord.ID, location.DriverID, location.Latitude, location.Longitude, location.AccuracyMeters, location.SpeedKmh, location.HeadingDegrees)
 	if err != nil {
-		return model.LocationResponse{}, err
+		return ridemodel.Coordinate{}, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return model.LocationResponse{}, err
+		return ridemodel.Coordinate{}, err
 	}
 
-	resp := model.LocationResponse{
-		CoordinateID: coordinateID,
-		UpdatedAt:    time.Now().UTC().Format(time.RFC3339),
-	}
-
-	return resp, nil
+	return coord, nil
 }
 
-func (r *DriverRepository) Start(ctx context.Context, driverID string, rideID string, req model.Location) (model.StartResponse, error) {
+func (r *DriverRepository) Start(ctx context.Context, driverID uuid.UUID, rideID uuid.UUID, loc model.Location) (model.DriverStatus, time.Time, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
-		return model.StartResponse{}, err
+		return "", time.Time{}, err
 	}
 	defer tx.Rollback(ctx)
 
-	_, err = tx.Exec(ctx, `
-		UPDATE rides
-		SET status = 'IN_PROGRESS',
-		    started_at = now(),
-		    updated_at = now()
-		WHERE id = $1
-	`, rideID)
+	var startedAt time.Time
+	err = tx.QueryRow(ctx, `
+	UPDATE rides
+	SET status = 'IN_PROGRESS',
+	    started_at = now(),
+	    updated_at = now()
+	WHERE id = $1
+	RETURNING started_at
+`, rideID).Scan(&startedAt)
 	if err != nil {
-		return model.StartResponse{}, fmt.Errorf("failed to update ride: %w", err)
+		return "", time.Time{}, fmt.Errorf("failed to update ride: %w", err)
 	}
 
+	newStatus := model.DriverStatus("BUSY")
 	_, err = tx.Exec(ctx, `
 		UPDATE drivers
-		SET status = 'BUSY',
+		SET status = $2,
 		    updated_at = now()
 		WHERE id = $1
-	`, driverID)
+	`, driverID, newStatus)
 	if err != nil {
-		return model.StartResponse{}, fmt.Errorf("failed to update driver status: %w", err)
+		return "", time.Time{}, fmt.Errorf("failed to update driver status: %w", err)
 	}
 
-	_, err = tx.Exec(ctx, `
-		INSERT INTO coordinates (entity_id, entity_type, address, latitude, longitude, is_current)
-		VALUES ($1, 'driver', 'current location', $2, $3, true)
-	`, driverID, req.Latitude, req.Longitude)
+	var coordinateID uuid.UUID
+	err = tx.QueryRow(ctx, `
+        INSERT INTO coordinates (entity_id, entity_type, address, latitude, longitude, is_current)
+        VALUES ($1, 'driver', 'current location', $2, $3, true)
+        RETURNING id
+    `, driverID, loc.Latitude, loc.Longitude).Scan(&coordinateID)
 	if err != nil {
-		return model.StartResponse{}, fmt.Errorf("failed to insert coordinates: %w", err)
+		return "", time.Time{}, fmt.Errorf("failed to insert coordinates: %w", err)
 	}
 
-	_, err = tx.Exec(ctx, `
-		INSERT INTO ride_events (ride_id, event_type, event_data)
-		VALUES (
-			$1,
-			'RIDE_STARTED',
-			jsonb_build_object(
-				'driver_id', $2,
-				'location', jsonb_build_object('latitude', $3, 'longitude', $4),
-				'started_at', now()
-			)
-		)
-	`, rideID, driverID, req.Latitude, req.Longitude)
+	var history model.LocationHistory
+	err = tx.QueryRow(ctx, `
+        INSERT INTO location_history (coordinate_id, driver_id, latitude, longitude, recorded_at, ride_id)
+        VALUES ($1, $2, $3, $4, now(), $5)
+        RETURNING id, coordinate_id, driver_id, latitude, longitude, recorded_at, ride_id
+    `, coordinateID, driverID, loc.Latitude, loc.Longitude, rideID).Scan(
+		&history.ID, &history.CoordinateID, &history.DriverID,
+		&history.Latitude, &history.Longitude, &history.RecordedAt, &history.RideID,
+	)
 	if err != nil {
-		return model.StartResponse{}, fmt.Errorf("failed to insert ride event: %w", err)
+		return "", time.Time{}, fmt.Errorf("failed to insert location history: %w", err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return model.StartResponse{}, fmt.Errorf("failed to commit transaction: %w", err)
+		return "", time.Time{}, fmt.Errorf("commit failed: %w", err)
 	}
 
-	responce := model.StartResponse{
-		RideID:    rideID,
-		Status:    "BUSY",
-		StartedAt: time.Now().UTC().Format(time.RFC3339),
-		Message:   "Ride started successfully",
-	}
-
-	return responce, nil
+	return newStatus, startedAt, nil
 }
 
-func (r *DriverRepository) Complete(ctx context.Context, driverID string, driverEarning float64, req model.CompleteRequest, location model.Location) (model.CompleteResponse, error) {
-	var resp model.CompleteResponse
+func (r *DriverRepository) Complete(ctx context.Context, driverID uuid.UUID, driverEarning float64, location model.Location, distance, duration float64) (time.Time, error) {
+	var completedAt time.Time
 
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
-		return resp, fmt.Errorf("failed to start transaction: %w", err)
+		return time.Time{}, fmt.Errorf("failed to start transaction: %w", err)
 	}
 	defer tx.Rollback(ctx)
 
@@ -316,20 +301,19 @@ func (r *DriverRepository) Complete(ctx context.Context, driverID string, driver
 			actual_distance_km = $4,
 			actual_duration_min = $5,
 			completed_at = now()
-		WHERE id = $6 AND driver_id = $7
-		RETURNING id, status, to_char(completed_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+		WHERE driver_id = $6
+		RETURNING completed_at
 	`,
 		driverEarning,
 		location.Latitude,
 		location.Longitude,
-		req.ActualDistanceKm,
-		req.ActualDurationMins,
-		req.RideID,
+		distance,
+		duration,
 		driverID,
-	).Scan(&resp.RideID, &resp.Status, &resp.CompletedAt)
+	).Scan(&completedAt)
 
 	if err != nil {
-		return resp, fmt.Errorf("failed to update ride: %w", err)
+		return time.Time{}, fmt.Errorf("failed to update ride: %w", err)
 	}
 
 	_, err = tx.Exec(ctx, `
@@ -342,32 +326,36 @@ func (r *DriverRepository) Complete(ctx context.Context, driverID string, driver
 		WHERE id = $2
 	`, driverEarning, driverID)
 	if err != nil {
-		return resp, fmt.Errorf("failed to update driver stats: %w", err)
+		return time.Time{}, fmt.Errorf("failed to update driver stats: %w", err)
 	}
 
 	_, err = tx.Exec(ctx, `
 		INSERT INTO ride_events (ride_id, event_type, event_data)
-		VALUES ($1, 'RIDE_COMPLETED', jsonb_build_object(
-			'driver_id', $2,
-			'earned', $3,
-			'distance_km', $4,
-			'duration_min', $5,
-			'completed_at', now()
-		))
-	`, req.RideID, driverID, driverEarning, req.ActualDistanceKm, req.ActualDurationMins)
+		VALUES (
+			(SELECT id FROM rides WHERE driver_id = $1 ORDER BY completed_at DESC LIMIT 1),
+			'RIDE_COMPLETED',
+			jsonb_build_object(
+				'driver_id', $1,
+				'earned', $2,
+				'distance_km', $3,
+				'duration_min', $4,
+				'completed_at', now()
+			)
+		)
+	`, driverID, driverEarning, distance, duration)
 	if err != nil {
-		return resp, fmt.Errorf("failed to insert ride event: %w", err)
+		return time.Time{}, fmt.Errorf("failed to insert ride event: %w", err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return resp, fmt.Errorf("failed to commit transaction: %w", err)
+		return time.Time{}, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	return resp, nil
+	return completedAt, nil
 }
 
-func (r *DriverRepository) GetRideStatus(ctx context.Context, driverID, rideID string) (string, error) {
-	var status string
+func (r *DriverRepository) GetRideStatus(ctx context.Context, driverID, rideID uuid.UUID) (ridemodel.RideStatus, error) {
+	var status ridemodel.RideStatus
 	err := r.db.QueryRow(ctx, `
 		SELECT status 
 		FROM rides 
@@ -380,8 +368,8 @@ func (r *DriverRepository) GetRideStatus(ctx context.Context, driverID, rideID s
 	return status, nil
 }
 
-func (r *DriverRepository) GetDriverStatus(ctx context.Context, driverID string) (string, error) {
-	var status string
+func (r *DriverRepository) GetDriverStatus(ctx context.Context, driverID uuid.UUID) (model.DriverStatus, error) {
+	var status model.DriverStatus
 	err := r.db.QueryRow(ctx, `
 		SELECT status 
 		FROM drivers 

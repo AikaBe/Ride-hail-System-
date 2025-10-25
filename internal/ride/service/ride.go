@@ -7,9 +7,12 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"ride-hail/internal/common/model"
 	common "ride-hail/internal/common/rmq"
 	"ride-hail/internal/common/websocket"
+	"ride-hail/internal/ride/model"
+	usermodel "ride-hail/internal/user/model"
+	"ride-hail/pkg/uuid"
+
 	"ride-hail/internal/ride/repository"
 	rmqClient "ride-hail/internal/ride/rmq"
 	"strings"
@@ -102,7 +105,7 @@ func (s *RideService) CreateRide(ctx context.Context, ride model.Ride, pickup, d
 
 	rideNumber := fmt.Sprintf("RIDE_%s", time.Now().Format("20060102_150405"))
 
-	pickup.EntityType = model.EntityTypePassenger
+	pickup.EntityType = usermodel.EntityTypePassenger
 	pickup.FareAmount = &estimatedFare
 	pickup.DistanceKm = &distanceKm
 	pickup.DurationMinute = &durationMin
@@ -113,7 +116,7 @@ func (s *RideService) CreateRide(ctx context.Context, ride model.Ride, pickup, d
 		return nil, 0, 0, fmt.Errorf("failed to create pickup coordinate: %w", err)
 	}
 
-	destination.EntityType = model.EntityTypePassenger
+	destination.EntityType = usermodel.EntityTypePassenger
 	destination.FareAmount = &estimatedFare
 	destination.DistanceKm = &distanceKm
 	destination.DurationMinute = &durationMin
@@ -125,8 +128,8 @@ func (s *RideService) CreateRide(ctx context.Context, ride model.Ride, pickup, d
 	}
 
 	status := model.RideRequested
-	pickupID := model.UUID(pickupCoordID)
-	destID := model.UUID(destCoordID)
+	pickupID := uuid.UUID(pickupCoordID)
+	destID := uuid.UUID(destCoordID)
 
 	ride.RideNumber = rideNumber
 	ride.Status = &status
@@ -252,15 +255,15 @@ func degreesToRadians(deg float64) float64 {
 	return deg * math.Pi / 180
 }
 
-func calculateFare(rideType model.VehicleType, distanceKm, durationMin float64) (float64, error) {
+func calculateFare(rideType usermodel.VehicleType, distanceKm, durationMin float64) (float64, error) {
 	var baseFare, perKm, perMin float64
 
 	switch rideType {
-	case model.VehicleEconomy:
+	case usermodel.VehicleEconomy:
 		baseFare, perKm, perMin = 500, 100, 50
-	case model.VehiclePremium:
+	case usermodel.VehiclePremium:
 		baseFare, perKm, perMin = 800, 120, 60
-	case model.VehicleXL:
+	case usermodel.VehicleXL:
 		baseFare, perKm, perMin = 1000, 150, 75
 	default:
 		return 0, fmt.Errorf("invalid ride_type: %s", rideType)

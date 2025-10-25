@@ -1,0 +1,42 @@
+package model
+
+import (
+	"ride-hail/pkg/uuid"
+	"time"
+)
+
+type DriverSession struct {
+	ID            uuid.UUID  `db:"id" json:"id"`
+	DriverID      uuid.UUID  `db:"driver_id" json:"driver_id"`
+	StartedAt     time.Time  `db:"started_at" json:"started_at"`
+	EndedAt       *time.Time `db:"ended_at" json:"ended_at,omitempty"`
+	TotalRides    int        `db:"total_rides" json:"total_rides"`
+	TotalEarnings float64    `db:"total_earnings" json:"total_earnings"`
+}
+
+type LocationHistory struct {
+	ID             uuid.UUID `db:"id" json:"id"`
+	CoordinateID   uuid.UUID `db:"coordinate_id" json:"coordinate_id,omitempty"`
+	DriverID       uuid.UUID `db:"driver_id" json:"driver_id,omitempty"`
+	Latitude       float64   `db:"latitude" json:"latitude"`
+	Longitude      float64   `db:"longitude" json:"longitude"`
+	AccuracyMeters float64   `db:"accuracy_meters" json:"accuracy_meters,omitempty"`
+	SpeedKmh       float64   `db:"speed_kmh" json:"speed_kmh,omitempty"`
+	HeadingDegrees float64   `db:"heading_degrees" json:"heading_degrees,omitempty"`
+	RecordedAt     time.Time `db:"recorded_at" json:"recorded_at"`
+	RideID         uuid.UUID `db:"ride_id" json:"ride_id,omitempty"`
+}
+
+type Location struct {
+	Latitude  float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
+}
+
+type DriverNearby struct {
+	ID        string  `json:"id"`
+	Email     string  `json:"email"`
+	Rating    float64 `json:"rating"`
+	Latitude  float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
+	Distance  float64 `json:"distance_km"`
+}
