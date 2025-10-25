@@ -1,20 +1,20 @@
 package rmq
 
 import (
-	"ride-hail/internal/ride/model"
+	usermodel "ride-hail/internal/user/model"
 	"time"
 )
 
 type RideRequestedMessage struct {
-	RideID              string            `json:"ride_id"`
-	RideNumber          string            `json:"ride_number"`
-	PickupLocation      Location          `json:"pickup_location"`
-	DestinationLocation Location          `json:"destination_location"`
-	RideType            model.VehicleType `json:"ride_type"`
-	EstimatedFare       float64           `json:"estimated_fare"`
-	MaxDistanceKm       float64           `json:"max_distance_km"`
-	TimeoutSeconds      int               `json:"timeout_seconds"`
-	CorrelationID       string            `json:"correlation_id"`
+	RideID              string                `json:"ride_id"`
+	RideNumber          string                `json:"ride_number"`
+	PickupLocation      Location              `json:"pickup_location"`
+	DestinationLocation Location              `json:"destination_location"`
+	RideType            usermodel.VehicleType `json:"ride_type"`
+	EstimatedFare       float64               `json:"estimated_fare"`
+	MaxDistanceKm       float64               `json:"max_distance_km"`
+	TimeoutSeconds      int                   `json:"timeout_seconds"`
+	CorrelationID       string                `json:"correlation_id"`
 }
 
 type Location struct {

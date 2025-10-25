@@ -3,9 +3,10 @@ package repository
 import (
 	"context"
 	"fmt"
-	"ride-hail/internal/common/uuid"
 	"ride-hail/internal/driver/model"
 	ridemodel "ride-hail/internal/ride/model"
+	usermodel "ride-hail/internal/user/model"
+	"ride-hail/pkg/uuid"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -19,7 +20,7 @@ func NewDriverRepository(db *pgx.Conn) *DriverRepository {
 	return &DriverRepository{db: db}
 }
 
-func (r *DriverRepository) FindNearbyDrivers(ctx context.Context, pickup model.Location, vehicleType ridemodel.VehicleType, radiusMeters float64) ([]model.DriverNearby, error) {
+func (r *DriverRepository) FindNearbyDrivers(ctx context.Context, pickup model.Location, vehicleType usermodel.VehicleType, radiusMeters float64) ([]model.DriverNearby, error) {
 	query := `
 		SELECT d.id, u.email, d.rating, c.latitude, c.longitude,
 		       ST_Distance(
@@ -221,7 +222,7 @@ func (r *DriverRepository) Location(ctx context.Context, location model.Location
 	return coord, nil
 }
 
-func (r *DriverRepository) Start(ctx context.Context, driverID uuid.UUID, rideID uuid.UUID, loc model.Location) (model.DriverStatus, time.Time, error) {
+func (r *DriverRepository) Start(ctx context.Context, driverID uuid.UUID, rideID uuid.UUID, loc model.Location) (usermodel.DriverStatus, time.Time, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return "", time.Time{}, err
@@ -241,7 +242,7 @@ func (r *DriverRepository) Start(ctx context.Context, driverID uuid.UUID, rideID
 		return "", time.Time{}, fmt.Errorf("failed to update ride: %w", err)
 	}
 
-	newStatus := model.DriverStatus("BUSY")
+	newStatus := usermodel.DriverStatus("BUSY")
 	_, err = tx.Exec(ctx, `
 		UPDATE drivers
 		SET status = $2,
@@ -368,8 +369,8 @@ func (r *DriverRepository) GetRideStatus(ctx context.Context, driverID, rideID u
 	return status, nil
 }
 
-func (r *DriverRepository) GetDriverStatus(ctx context.Context, driverID uuid.UUID) (model.DriverStatus, error) {
-	var status model.DriverStatus
+func (r *DriverRepository) GetDriverStatus(ctx context.Context, driverID uuid.UUID) (usermodel.DriverStatus, error) {
+	var status usermodel.DriverStatus
 	err := r.db.QueryRow(ctx, `
 		SELECT status 
 		FROM drivers 

@@ -17,7 +17,11 @@ func NewUserRepository(db *pgx.Conn) *UserRepository {
 	return &UserRepository{db: db}
 }
 
-func (r *UserRepository) CreateUser(ctx context.Context, user model.User) (model.User, error) {
+func (r *UserRepository) BeginTx(ctx context.Context) (pgx.Tx, error) {
+	return r.db.Begin(ctx)
+}
+
+func (r *UserRepository) CreateUser(ctx context.Context, tx pgx.Tx, user model.User) (model.User, error) {
 	var created model.User
 
 	query := `
@@ -26,7 +30,7 @@ func (r *UserRepository) CreateUser(ctx context.Context, user model.User) (model
 		RETURNING id, created_at, updated_at, email, role, status, password_hash, attrs
 	`
 
-	err := r.db.QueryRow(
+	err := tx.QueryRow(
 		ctx,
 		query,
 		user.Email,
@@ -51,7 +55,7 @@ func (r *UserRepository) CreateUser(ctx context.Context, user model.User) (model
 	return created, nil
 }
 
-func (r *UserRepository) CreateDriver(ctx context.Context, driver model.Driver) (model.Driver, error) {
+func (r *UserRepository) CreateDriver(ctx context.Context, tx pgx.Tx, driver model.Driver) (model.Driver, error) {
 	var created model.Driver
 	var vehicleAttrsJSON []byte
 
@@ -74,7 +78,7 @@ func (r *UserRepository) CreateDriver(ctx context.Context, driver model.Driver) 
 		          vehicle_attrs, rating, total_rides, total_earnings, status, is_verified
 	`
 
-	err := r.db.QueryRow(
+	err := tx.QueryRow(
 		ctx,
 		query,
 		driver.ID,

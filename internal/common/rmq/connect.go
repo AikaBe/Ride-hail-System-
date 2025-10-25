@@ -44,7 +44,6 @@ func (r *RabbitMQ) connect() error {
 			return nil
 		}
 
-		logger.Warn("rmq_reconnect_attempt", fmt.Sprintf("Reconnect attempt %d failed", i), "", "", err.Error(), "")
 		time.Sleep(time.Second * time.Duration(math.Pow(2, float64(i)))) // exponential backoff
 	}
 

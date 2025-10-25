@@ -22,7 +22,6 @@ func RunDriver(cfg *config.Config, conn *pgx.Conn, commonMq *commonrmq.RabbitMQ,
 	if err != nil {
 		log.Fatalf("failed to init driver rmq client: %v", err)
 	}
-	defer rmqClient.Close()
 
 	repo := repository.NewDriverRepository(conn)
 
@@ -40,7 +39,7 @@ func RunDriver(cfg *config.Config, conn *pgx.Conn, commonMq *commonrmq.RabbitMQ,
 	mux.HandleFunc("POST /drivers/{driver_id}/start", h.Start)
 	mux.HandleFunc("POST /drivers/{driver_id}/complete", h.Complete)
 
-	mux.HandleFunc("/ws/drivers/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("drivers/ws/drivers/", func(w http.ResponseWriter, r *http.Request) {
 		ws.DriverWSHandler(w, r, hub)
 	})
 }

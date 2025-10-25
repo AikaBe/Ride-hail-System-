@@ -7,24 +7,25 @@ import (
 	"fmt"
 	"log"
 	commonmq "ride-hail/internal/common/rmq"
-	"ride-hail/internal/common/uuid"
 	"ride-hail/internal/common/websocket"
 	"ride-hail/internal/driver/handler/dto"
 	"ride-hail/internal/driver/model"
 	"ride-hail/internal/driver/rmq"
 	model2 "ride-hail/internal/ride/model"
+	usermodel "ride-hail/internal/user/model"
+	"ride-hail/pkg/uuid"
 	"time"
 )
 
 type DriverRepository interface {
-	FindNearbyDrivers(ctx context.Context, pickup model.Location, vehicleType model2.VehicleType, radiusMeters float64) ([]model.DriverNearby, error)
+	FindNearbyDrivers(ctx context.Context, pickup model.Location, vehicleType usermodel.VehicleType, radiusMeters float64) ([]model.DriverNearby, error)
 	SetOnline(ctx context.Context, driverID uuid.UUID, lat, lon float64) (model.DriverSession, error)
 	SetOffline(ctx context.Context, driverID uuid.UUID) (model.DriverSession, error)
 	Location(ctx context.Context, location model.LocationHistory) (model2.Coordinate, error)
-	Start(ctx context.Context, driverID uuid.UUID, rideID uuid.UUID, loc model.Location) (model.DriverStatus, time.Time, error)
+	Start(ctx context.Context, driverID uuid.UUID, rideID uuid.UUID, loc model.Location) (usermodel.DriverStatus, time.Time, error)
 	Complete(ctx context.Context, driverID uuid.UUID, driverEarning float64, location model.Location, distance, duration float64) (time.Time, error)
 	GetRideStatus(ctx context.Context, driverID, rideID uuid.UUID) (model2.RideStatus, error)
-	GetDriverStatus(ctx context.Context, driverID uuid.UUID) (model.DriverStatus, error)
+	GetDriverStatus(ctx context.Context, driverID uuid.UUID) (usermodel.DriverStatus, error)
 }
 
 type DriverService struct {
@@ -192,7 +193,7 @@ func (s *DriverService) GoOnline(ctx context.Context, driverID uuid.UUID, lat, l
 	if err != nil {
 		return model.DriverSession{}, err
 	}
-	if driverStatus != model.DriverStatusOffline {
+	if driverStatus != usermodel.DriverStatusOffline {
 		return model.DriverSession{}, errors.New("driver is not offline")
 	}
 	return s.repo.SetOnline(ctx, driverID, lat, lon)
@@ -203,7 +204,7 @@ func (s *DriverService) GoOffline(ctx context.Context, driverID uuid.UUID) (mode
 	if err != nil {
 		return model.DriverSession{}, 0, err
 	}
-	if driverStatus == model.DriverStatusEnRoute || driverStatus == model.DriverStatusBusy {
+	if driverStatus == usermodel.DriverStatusEnRoute || driverStatus == usermodel.DriverStatusBusy {
 		return model.DriverSession{}, 0, errors.New("driver cannot go offline(driver status: EN_ROUTE or BUSY)")
 	}
 	session, err := s.repo.SetOffline(ctx, driverID)
@@ -309,7 +310,7 @@ func (s *DriverService) Complete(ctx context.Context, driverID uuid.UUID, req dt
 	if err != nil {
 		return dto.CompleteResponse{}, err
 	}
-	if driverStatus != model.DriverStatusBusy {
+	if driverStatus != usermodel.DriverStatusBusy {
 		return dto.CompleteResponse{}, errors.New("driver status not busy")
 	}
 
@@ -323,7 +324,7 @@ func (s *DriverService) Complete(ctx context.Context, driverID uuid.UUID, req dt
 	}
 	resp := dto.CompleteResponse{
 		RideID:        string(req.RideID),
-		Status:        model.DriverStatusAvailable,
+		Status:        usermodel.DriverStatusAvailable,
 		CompletedAt:   completedAt.Format(time.RFC3339),
 		DriverEarning: driverEarnings,
 		Message:       "Ride completed successfully",

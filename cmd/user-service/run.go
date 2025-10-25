@@ -18,4 +18,5 @@ func RunUser(db *pgx.Conn, mux *http.ServeMux) {
 
 	mux.HandleFunc("/register", authHandler.Register)
 	mux.HandleFunc("/login", authHandler.Login)
+	mux.HandleFunc("/refresh", authHandler.RefreshToken)
 }

@@ -23,7 +23,6 @@ func RunRide(cfg *config.Config, conn *pgx.Conn, commonMq *commonrmq.RabbitMQ, m
 	if err != nil {
 		log.Fatalf("failed to init driver rmq client: %v", err)
 	}
-	defer rmqClient.Close()
 
 	hub := websocket.NewHub()
 	go hub.Run()
@@ -37,7 +36,7 @@ func RunRide(cfg *config.Config, conn *pgx.Conn, commonMq *commonrmq.RabbitMQ, m
 	mux.HandleFunc("POST /rides", handler.CreateRide)
 	mux.HandleFunc("POST /rides/{ride_id}/cancel", handler.CancelRide)
 
-	mux.HandleFunc("/ws/drivers/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("rides/ws/drivers/", func(w http.ResponseWriter, r *http.Request) {
 		ws.PassengerWSHandler(w, r, hub)
 	})
 }

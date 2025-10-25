@@ -22,30 +22,73 @@ func (p *Postgres) RunMigrations(migrationsDir string) error {
 		return fmt.Errorf("failed to read migration files: %w", err)
 	}
 
-	tx, err := p.Conn.Begin(context.Background())
+	// 1️⃣ Создаём таблицу для учёта миграций (если нет)
+	_, err = p.Conn.Exec(context.Background(), `
+		CREATE TABLE IF NOT EXISTS _migrations (
+			id SERIAL PRIMARY KEY,
+			filename TEXT UNIQUE NOT NULL,
+			applied_at TIMESTAMP NOT NULL DEFAULT NOW()
+		)
+	`)
 	if err != nil {
-		logger.Error("db_migrations_tx_failed", "Failed to start migration transaction", "", "", err.Error(), "")
-		return fmt.Errorf("failed to start migration transaction: %w", err)
+		logger.Error("db_migrations_table_failed", "Failed to ensure _migrations table", "", "", err.Error(), "")
+		return fmt.Errorf("failed to create _migrations table: %w", err)
 	}
-	defer tx.Rollback(context.Background())
 
+	// 2️⃣ Получаем список уже выполненных миграций
+	executed := make(map[string]bool)
+	rows, err := p.Conn.Query(context.Background(), "SELECT filename FROM _migrations")
+	if err != nil {
+		logger.Error("db_migrations_query_failed", "Failed to fetch applied migrations", "", "", err.Error(), "")
+		return fmt.Errorf("failed to query applied migrations: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var fname string
+		if err := rows.Scan(&fname); err != nil {
+			return err
+		}
+		executed[fname] = true
+	}
+
+	// 3️⃣ Применяем только те, что ещё не выполнены
 	for _, file := range files {
+		name := filepath.Base(file)
+		if executed[name] {
+			logger.Info("db_migration_skip", fmt.Sprintf("Skipping already applied migration: %s", name), "", "")
+			continue
+		}
+
 		content, err := os.ReadFile(file)
 		if err != nil {
-			logger.Error("db_migration_read_file_failed", fmt.Sprintf("Failed to read migration file %s", file), "", "", err.Error(), "")
-			return fmt.Errorf("failed to read migration file %s: %w", file, err)
+			logger.Error("db_migration_read_file_failed", fmt.Sprintf("Failed to read migration file %s", name), "", "", err.Error(), "")
+			return fmt.Errorf("failed to read migration file %s: %w", name, err)
 		}
 
-		logger.Info("db_migration_apply", fmt.Sprintf("Applying migration: %s", filepath.Base(file)), "", "")
+		logger.Info("db_migration_apply", fmt.Sprintf("Applying migration: %s", name), "", "")
+		tx, err := p.Conn.Begin(context.Background())
+		if err != nil {
+			return fmt.Errorf("failed to start migration transaction: %w", err)
+		}
+
+		// выполняем SQL из файла
 		if _, err := tx.Exec(context.Background(), string(content)); err != nil {
-			logger.Error("db_migration_failed", fmt.Sprintf("Migration %s failed", file), "", "", err.Error(), "")
-			return fmt.Errorf("migration %s failed: %w", file, err)
+			tx.Rollback(context.Background())
+			logger.Error("db_migration_failed", fmt.Sprintf("Migration %s failed", name), "", "", err.Error(), "")
+			return fmt.Errorf("migration %s failed: %w", name, err)
 		}
-	}
 
-	if err := tx.Commit(context.Background()); err != nil {
-		logger.Error("db_migrations_commit_failed", "Failed to commit migrations", "", "", err.Error(), "")
-		return fmt.Errorf("failed to commit migrations: %w", err)
+		// записываем факт применения миграции
+		if _, err := tx.Exec(context.Background(),
+			"INSERT INTO _migrations (filename) VALUES ($1)", name); err != nil {
+			tx.Rollback(context.Background())
+			return fmt.Errorf("failed to record migration %s: %w", name, err)
+		}
+
+		if err := tx.Commit(context.Background()); err != nil {
+			return fmt.Errorf("failed to commit migration %s: %w", name, err)
+		}
 	}
 
 	logger.Info("db_migrations_done", fmt.Sprintf("Migrations applied successfully in %v", time.Since(start)), "", "")

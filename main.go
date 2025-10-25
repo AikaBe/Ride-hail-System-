@@ -1,14 +1,18 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
 	cmdDriver "ride-hail/cmd/driver-location-service"
 	cmdRide "ride-hail/cmd/ride-service"
 	cmdUser "ride-hail/cmd/user-service"
 	"ride-hail/internal/common/config"
 	"ride-hail/internal/common/db"
 	"ride-hail/internal/common/rmq"
+	"syscall"
 	"time"
 )
 
@@ -31,31 +35,21 @@ func main() {
 		log.Fatalf("migration error: %v", err)
 	}
 
-	rmq, err := rmq.NewRabbitMQ(
+	commonRMQ, err := rmq.NewRabbitMQ(
 		cfg.RabbitMQ.Host, cfg.RabbitMQ.Port,
 		cfg.RabbitMQ.User, cfg.RabbitMQ.Password,
 	)
 	if err != nil {
 		log.Fatalf("rabbitmq error: %v", err)
 	}
-	defer rmq.Close()
+	defer commonRMQ.Close()
 
-	go func() {
-		log.Println("WebSocket server running on ws://localhost:3001")
-		if err := http.ListenAndServe(":3001", nil); err != nil {
-			log.Fatalf("WebSocket server error: %v", err)
-		}
-	}()
-	go func() {
-		log.Println("HTTP server running on :8085")
-		if err := http.ListenAndServe(":8085", nil); err != nil {
-			log.Fatalf("HTTP server error: %v", err)
-		}
-	}()
 	mux := http.NewServeMux()
+
+	cmdRide.RunRide(cfg, pg.Conn, commonRMQ, mux)
+	cmdDriver.RunDriver(cfg, pg.Conn, commonRMQ, mux)
 	cmdUser.RunUser(pg.Conn, mux)
-	cmdRide.RunRide(cfg, pg.Conn, rmq, mux)
-	cmdDriver.RunDriver(cfg, pg.Conn, rmq, mux)
+
 	server := &http.Server{
 		Addr:         ":8080",
 		Handler:      mux,
@@ -63,9 +57,30 @@ func main() {
 		WriteTimeout: 10 * time.Second,
 	}
 
-	log.Println("🚀 All services are up on port 8080")
-	if err := server.ListenAndServe(); err != nil {
-		log.Fatalf("server failed: %v", err)
-	}
+	go func() {
+		wsMux := http.NewServeMux()
+		log.Println("WebSocket server running on ws://localhost:3001")
+		if err := http.ListenAndServe(":3001", wsMux); err != nil {
+			log.Fatalf("WebSocket server error: %v", err)
+		}
+	}()
 
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		log.Println("🚀 All services are up on port 8080")
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("server failed: %v", err)
+		}
+	}()
+
+	<-stop
+	log.Println("⏹ Shutting down gracefully...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	server.Shutdown(ctx)
+
+	log.Println("✅ Shutdown complete")
 }

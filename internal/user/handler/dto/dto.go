@@ -33,6 +33,15 @@ type LoginResponse struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
+type RefreshTokenRequest struct {
+	RefreshToken string `json:"refresh_token" validate:"required"`
+}
+
+type RefreshTokenResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+}
+
 func (r *RegisterRequest) Validate() error {
 	if strings.TrimSpace(r.Email) == "" {
 		return errors.New("email is required")
@@ -50,7 +59,7 @@ func (r *RegisterRequest) Validate() error {
 		if r.LicenseNumber == "" {
 			return errors.New("license_number is required for drivers")
 		}
-	case model.RolePassenger:
+	case model.RolePassenger, model.RoleAdmin:
 		// ok
 	default:
 		return fmt.Errorf("unknown role: %s", r.Role)

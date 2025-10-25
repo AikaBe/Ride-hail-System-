@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"ride-hail/internal/common/uuid"
 	"ride-hail/internal/driver/handler/dto"
 	"ride-hail/internal/driver/model"
 	"ride-hail/internal/driver/service"
+	usermodel "ride-hail/internal/user/model"
+	"ride-hail/pkg/uuid"
 )
 
 type DriverHandler struct {
@@ -38,7 +39,7 @@ func (h *DriverHandler) GoOnline(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 	resp := dto.OnlineResponse{
-		Status:    model.DriverStatusAvailable,
+		Status:    usermodel.DriverStatusAvailable,
 		SessionID: string(driverSession.ID),
 		Message:   "You are now online and ready to accept rides",
 	}
