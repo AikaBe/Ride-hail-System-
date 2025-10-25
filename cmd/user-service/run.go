@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func Run(db *pgx.Conn, mux *http.ServeMux) {
+func RunUser(db *pgx.Conn, mux *http.ServeMux) {
 	userRepo := repository.NewUserRepository(db)
 	tokenManager := token.NewManager("supersecret", 15*time.Minute, 7*24*time.Hour)
 	authService := service.NewAuthService(userRepo, tokenManager)

@@ -1,4 +1,4 @@
-package handler
+package dto
 
 type RideRequest struct {
 	PassengerID          string  `json:"passenger_id"`

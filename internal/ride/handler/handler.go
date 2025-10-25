@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"ride-hail/internal/common/logger"
+	"ride-hail/internal/ride/handler/dto"
 	"ride-hail/internal/ride/service"
 )
 
@@ -20,14 +21,14 @@ func (h *RideHandler) CreateRide(w http.ResponseWriter, r *http.Request) {
 	const action = "CreateRide"
 	requestID := r.Header.Get("X-Request-ID") // если есть requestID из заголовка
 
-	var req RideRequest
+	var req dto.RideRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		logger.Error(action, "invalid JSON in request body", requestID, "", err.Error(), "")
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
 
-	ride, pickup, destination, err := MapRideRequestToEntities(req)
+	ride, pickup, destination, err := dto.MapRideRequestToEntities(req)
 	if err != nil {
 		logger.Error(action, "failed to map ride request to entities", requestID, "", err.Error(), "")
 		http.Error(w, "invalid request mapping", http.StatusBadRequest)
@@ -41,7 +42,7 @@ func (h *RideHandler) CreateRide(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := RideResponse{
+	resp := dto.RideResponse{
 		RideID:                   string(createdRide.ID),
 		RideNumber:               createdRide.RideNumber,
 		Status:                   string(*createdRide.Status),
@@ -59,19 +60,18 @@ func (h *RideHandler) CreateRide(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to encode response", http.StatusInternalServerError)
 	}
 }
-
 func (h *RideHandler) CancelRide(w http.ResponseWriter, r *http.Request) {
 	const action = "CancelRide"
 	requestID := r.Header.Get("X-Request-ID")
 
-	rideID := r.URL.Query().Get("ride_id")
+	rideID := r.PathValue("ride_id")
 	if rideID == "" {
-		logger.Warn(action, "ride_id not provided in query", requestID, "", "")
+		logger.Warn(action, "ride_id not provided in path", requestID, "", "")
 		http.Error(w, "ride_id is required", http.StatusBadRequest)
 		return
 	}
 
-	var req CancelRideRequest
+	var req dto.CancelRideRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		logger.Error(action, "invalid JSON in request body", requestID, rideID, err.Error(), "")
 		http.Error(w, "invalid JSON", http.StatusBadRequest)

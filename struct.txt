@@ -1,11 +1,11 @@
 ride-hail/
 ├── cmd/
 │   ├── ride-service/
-│   │   └── main.go
+│   │   └── run.go
 │   ├── driver-location-service/
-│   │   └── main.go
-│   └── admin-service/
-│       └── main.go
+│   │   └── run.go
+│   └── user-service/
+│       └── run.go
 │
 ├── internal/
 │   ├── ride/

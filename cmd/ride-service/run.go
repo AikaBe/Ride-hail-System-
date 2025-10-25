@@ -16,7 +16,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func Run(cfg *config.Config, conn *pgx.Conn, commonMq *commonrmq.RabbitMQ, mux *http.ServeMux) {
+func RunRide(cfg *config.Config, conn *pgx.Conn, commonMq *commonrmq.RabbitMQ, mux *http.ServeMux) {
 	log.Printf("Ride Service running on port %d\n", cfg.Services.RideServicePort)
 
 	rmqClient, err := ridermq.NewClient(commonMq.URL, "ride_topic")
@@ -25,23 +25,19 @@ func Run(cfg *config.Config, conn *pgx.Conn, commonMq *commonrmq.RabbitMQ, mux *
 	}
 	defer rmqClient.Close()
 
-	repo := repository.NewRideRepository(conn)
-
 	hub := websocket.NewHub()
 	go hub.Run()
 
+	repo := repository.NewRideRepository(conn)
 	service := service.NewRideManager(repo, rmqClient, hub)
+	handler := ridehttp.NewRideHandler(service)
 
 	go service.ListenForRides(context.Background(), "driver_responses")
 
-	handler := ridehttp.NewRideHandler(service)
-
-	ridehttp.SetupRoutes(mux, handler)
+	mux.HandleFunc("POST /rides", handler.CreateRide)
+	mux.HandleFunc("POST /rides/{ride_id}/cancel", handler.CancelRide)
 
 	mux.HandleFunc("/ws/drivers/", func(w http.ResponseWriter, r *http.Request) {
 		ws.PassengerWSHandler(w, r, hub)
 	})
-
-	log.Println("🚀 Server running on port 8080")
-	http.ListenAndServe(":8080", mux)
 }

@@ -9,7 +9,7 @@ import (
 	"ride-hail/internal/common/config"
 	"ride-hail/internal/common/db"
 	"ride-hail/internal/common/rmq"
-	"ride-hail/internal/user/handler"
+	"time"
 )
 
 func main() {
@@ -53,8 +53,19 @@ func main() {
 		}
 	}()
 	mux := http.NewServeMux()
-	go cmdUser.Run(pg.Conn, mux)
-	go cmdRide.Run(cfg, pg.Conn, rmq, mux)
-	go cmdDriver.DriverMain(cfg, pg.Conn, rmq, mux)
-	select {}
+	cmdUser.RunUser(pg.Conn, mux)
+	cmdRide.RunRide(cfg, pg.Conn, rmq, mux)
+	cmdDriver.RunDriver(cfg, pg.Conn, rmq, mux)
+	server := &http.Server{
+		Addr:         ":8080",
+		Handler:      mux,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+	}
+
+	log.Println("🚀 All services are up on port 8080")
+	if err := server.ListenAndServe(); err != nil {
+		log.Fatalf("server failed: %v", err)
+	}
+
 }

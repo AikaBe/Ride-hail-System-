@@ -2,6 +2,7 @@ package driver_location_service
 
 import (
 	"context"
+	"github.com/jackc/pgx/v5"
 	"log"
 	"net/http"
 	"ride-hail/internal/common/config"
@@ -12,12 +13,9 @@ import (
 	driverrmq "ride-hail/internal/driver/rmq"
 	"ride-hail/internal/driver/service"
 	ws "ride-hail/internal/driver/websocket"
-	"strconv"
-
-	"github.com/jackc/pgx/v5"
 )
 
-func DriverMain(cfg *config.Config, conn *pgx.Conn, commonMq *commonrmq.RabbitMQ, mux *http.ServeMux) {
+func RunDriver(cfg *config.Config, conn *pgx.Conn, commonMq *commonrmq.RabbitMQ, mux *http.ServeMux) {
 	log.Println("Starting Driver & Location Service...")
 
 	rmqClient, err := driverrmq.NewClient(commonMq.URL, "driver_topic")
@@ -45,11 +43,4 @@ func DriverMain(cfg *config.Config, conn *pgx.Conn, commonMq *commonrmq.RabbitMQ
 	mux.HandleFunc("/ws/drivers/", func(w http.ResponseWriter, r *http.Request) {
 		ws.DriverWSHandler(w, r, hub)
 	})
-
-	addr := ":" + strconv.Itoa(cfg.Services.DriverLocationServicePort)
-	log.Printf("Driver service running on %s", addr)
-
-	if err := http.ListenAndServe(addr, mux); err != nil {
-		log.Fatalf("driver-status-service failed: %v", err)
-	}
 }
