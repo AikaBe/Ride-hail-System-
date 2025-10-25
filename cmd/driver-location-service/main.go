@@ -17,7 +17,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func DriverMain(cfg *config.Config, conn *pgx.Conn, commonMq *commonrmq.RabbitMQ) {
+func DriverMain(cfg *config.Config, conn *pgx.Conn, commonMq *commonrmq.RabbitMQ, mux *http.ServeMux) {
 	log.Println("Starting Driver & Location Service...")
 
 	rmqClient, err := driverrmq.NewClient(commonMq.URL, "driver_topic")
@@ -36,7 +36,6 @@ func DriverMain(cfg *config.Config, conn *pgx.Conn, commonMq *commonrmq.RabbitMQ
 	go svc.ListenForRides(context.Background(), "ride_topic")
 
 	h := handler.NewHandler(svc)
-	mux := http.NewServeMux()
 	mux.HandleFunc("POST /drivers/{driver_id}/online", h.GoOnline)
 	mux.HandleFunc("POST /drivers/{driver_id}/offline", h.GoOffline)
 	mux.HandleFunc("POST /drivers/{driver_id}/location", h.Location)

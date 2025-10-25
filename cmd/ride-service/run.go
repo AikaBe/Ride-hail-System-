@@ -16,7 +16,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func Run(cfg *config.Config, conn *pgx.Conn, commonMq *commonrmq.RabbitMQ) {
+func Run(cfg *config.Config, conn *pgx.Conn, commonMq *commonrmq.RabbitMQ, mux *http.ServeMux) {
 	log.Printf("Ride Service running on port %d\n", cfg.Services.RideServicePort)
 
 	rmqClient, err := ridermq.NewClient(commonMq.URL, "ride_topic")
@@ -36,7 +36,6 @@ func Run(cfg *config.Config, conn *pgx.Conn, commonMq *commonrmq.RabbitMQ) {
 
 	handler := ridehttp.NewRideHandler(service)
 
-	mux := http.NewServeMux()
 	ridehttp.SetupRoutes(mux, handler)
 
 	mux.HandleFunc("/ws/drivers/", func(w http.ResponseWriter, r *http.Request) {

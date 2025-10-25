@@ -5,6 +5,7 @@ import (
 	"net/http"
 	cmdDriver "ride-hail/cmd/driver-location-service"
 	cmdRide "ride-hail/cmd/ride-service"
+	cmdUser "ride-hail/cmd/user-service"
 	"ride-hail/internal/common/config"
 	"ride-hail/internal/common/db"
 	"ride-hail/internal/common/rmq"
@@ -39,8 +40,6 @@ func main() {
 	}
 	defer rmq.Close()
 
-	http.HandleFunc("/register", handler.RegisterHandler(pg.Conn))
-
 	go func() {
 		log.Println("WebSocket server running on ws://localhost:3001")
 		if err := http.ListenAndServe(":3001", nil); err != nil {
@@ -53,8 +52,9 @@ func main() {
 			log.Fatalf("HTTP server error: %v", err)
 		}
 	}()
-
-	go cmdRide.Run(cfg, pg.Conn, rmq)
-	go cmdDriver.DriverMain(cfg, pg.Conn, rmq)
+	mux := http.NewServeMux()
+	go cmdUser.Run(pg.Conn, mux)
+	go cmdRide.Run(cfg, pg.Conn, rmq, mux)
+	go cmdDriver.DriverMain(cfg, pg.Conn, rmq, mux)
 	select {}
 }

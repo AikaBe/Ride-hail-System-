@@ -21,8 +21,8 @@ type AuthService struct {
 	tokenManager *token.Manager
 }
 
-func NewAuthService(userRepo UserRepository) *AuthService {
-	return &AuthService{userRepo: userRepo}
+func NewAuthService(userRepo UserRepository, tokenManager *token.Manager) *AuthService {
+	return &AuthService{userRepo: userRepo, tokenManager: tokenManager}
 }
 
 func (s *AuthService) Register(ctx context.Context, req dto.RegisterRequest) (model.User, error) {
