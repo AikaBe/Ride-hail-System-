@@ -12,10 +12,9 @@ import (
 	"ride-hail/internal/driver/repository"
 	driverrmq "ride-hail/internal/driver/rmq"
 	"ride-hail/internal/driver/service"
-	ws "ride-hail/internal/driver/websocket"
 )
 
-func RunDriver(cfg *config.Config, conn *pgx.Conn, commonMq *commonrmq.RabbitMQ, mux *http.ServeMux) {
+func RunDriver(cfg *config.Config, conn *pgx.Conn, commonMq *commonrmq.RabbitMQ, mux *http.ServeMux, hub *websocket.Hub) {
 	log.Println("Starting Driver & Location Service...")
 
 	rmqClient, err := driverrmq.NewClient(commonMq.URL, "driver_topic")
@@ -24,9 +23,6 @@ func RunDriver(cfg *config.Config, conn *pgx.Conn, commonMq *commonrmq.RabbitMQ,
 	}
 
 	repo := repository.NewDriverRepository(conn)
-
-	hub := websocket.NewHub()
-	go hub.Run()
 
 	svc := service.NewDriverService(repo, rmqClient, hub)
 
@@ -38,8 +34,4 @@ func RunDriver(cfg *config.Config, conn *pgx.Conn, commonMq *commonrmq.RabbitMQ,
 	mux.HandleFunc("POST /drivers/{driver_id}/location", h.Location)
 	mux.HandleFunc("POST /drivers/{driver_id}/start", h.Start)
 	mux.HandleFunc("POST /drivers/{driver_id}/complete", h.Complete)
-
-	mux.HandleFunc("drivers/ws/drivers/", func(w http.ResponseWriter, r *http.Request) {
-		ws.DriverWSHandler(w, r, hub)
-	})
 }

@@ -2,6 +2,7 @@ package ride_service
 
 import (
 	"context"
+	"github.com/jackc/pgx/v5"
 	"log"
 	"net/http"
 	"ride-hail/internal/common/config"
@@ -11,21 +12,15 @@ import (
 	"ride-hail/internal/ride/repository"
 	ridermq "ride-hail/internal/ride/rmq"
 	"ride-hail/internal/ride/service"
-	ws "ride-hail/internal/ride/websocket"
-
-	"github.com/jackc/pgx/v5"
 )
 
-func RunRide(cfg *config.Config, conn *pgx.Conn, commonMq *commonrmq.RabbitMQ, mux *http.ServeMux) {
+func RunRide(cfg *config.Config, conn *pgx.Conn, commonMq *commonrmq.RabbitMQ, mux *http.ServeMux, hub *websocket.Hub) {
 	log.Printf("Ride Service running on port %d\n", cfg.Services.RideServicePort)
 
 	rmqClient, err := ridermq.NewClient(commonMq.URL, "ride_topic")
 	if err != nil {
 		log.Fatalf("failed to init driver rmq client: %v", err)
 	}
-
-	hub := websocket.NewHub()
-	go hub.Run()
 
 	repo := repository.NewRideRepository(conn)
 	service := service.NewRideManager(repo, rmqClient, hub)
@@ -35,8 +30,4 @@ func RunRide(cfg *config.Config, conn *pgx.Conn, commonMq *commonrmq.RabbitMQ, m
 
 	mux.HandleFunc("POST /rides", handler.CreateRide)
 	mux.HandleFunc("POST /rides/{ride_id}/cancel", handler.CancelRide)
-
-	mux.HandleFunc("rides/ws/drivers/", func(w http.ResponseWriter, r *http.Request) {
-		ws.PassengerWSHandler(w, r, hub)
-	})
 }

@@ -12,6 +12,10 @@ import (
 	"ride-hail/internal/common/config"
 	"ride-hail/internal/common/db"
 	"ride-hail/internal/common/rmq"
+	"ride-hail/internal/common/websocket"
+	driverws "ride-hail/internal/driver/websocket"
+	ridews "ride-hail/internal/ride/websocket"
+	"ride-hail/internal/user/jwt"
 	"syscall"
 	"time"
 )
@@ -44,11 +48,35 @@ func main() {
 	}
 	defer commonRMQ.Close()
 
+	jwtManager := jwt.NewManager("super-secret-key", 15*time.Minute, 7*24*time.Hour)
+
+	hub := websocket.NewHub()
+	go hub.Run()
+
 	mux := http.NewServeMux()
 
-	cmdRide.RunRide(cfg, pg.Conn, commonRMQ, mux)
-	cmdDriver.RunDriver(cfg, pg.Conn, commonRMQ, mux)
-	cmdUser.RunUser(pg.Conn, mux)
+	cmdRide.RunRide(cfg, pg.Conn, commonRMQ, mux, hub)
+	cmdDriver.RunDriver(cfg, pg.Conn, commonRMQ, mux, hub)
+	cmdUser.RunUser(pg.Conn, mux, jwtManager)
+
+	wsMux := http.NewServeMux()
+
+	wsMux.HandleFunc("/ws/passengers/", func(w http.ResponseWriter, r *http.Request) {
+		ridews.PassengerWSHandler(w, r, hub, jwtManager)
+	})
+	wsMux.HandleFunc("/ws/drivers/", func(w http.ResponseWriter, r *http.Request) {
+		driverws.DriverWSHandler(w, r, hub, jwtManager)
+	})
+
+	go func() {
+		log.Println("WebSocket server running on ws://localhost:3000")
+		if err := http.ListenAndServe(":3000", wsMux); err != nil {
+			log.Fatalf("WebSocket server error: %v", err)
+		}
+	}()
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
 	server := &http.Server{
 		Addr:         ":8080",
@@ -56,17 +84,6 @@ func main() {
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 	}
-
-	go func() {
-		wsMux := http.NewServeMux()
-		log.Println("WebSocket server running on ws://localhost:3001")
-		if err := http.ListenAndServe(":3001", wsMux); err != nil {
-			log.Fatalf("WebSocket server error: %v", err)
-		}
-	}()
-
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
 		log.Println("🚀 All services are up on port 8080")

@@ -3,9 +3,9 @@ package websocket
 import (
 	"log"
 	"net/http"
+	"ride-hail/internal/user/jwt"
 	"time"
 
-	"ride-hail/internal/common/auth"
 	commonws "ride-hail/internal/common/websocket"
 
 	"github.com/gorilla/websocket"
@@ -20,7 +20,7 @@ var Upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
-func DriverWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hub) {
+func DriverWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hub, jwtManager *jwt.Manager) {
 	conn, err := Upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		http.Error(w, "WebSocket upgrade failed", http.StatusInternalServerError)
@@ -46,7 +46,7 @@ func DriverWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hub) 
 	}
 
 	// Проверяем токен
-	userID, err := auth.ValidateToken(authMsg.Token)
+	userID, err := jwtManager.ValidateToken(authMsg.Token)
 	if err != nil {
 		conn.WriteJSON(map[string]string{"error": "invalid token"})
 		conn.Close()

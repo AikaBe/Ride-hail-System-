@@ -3,8 +3,8 @@ package websocket
 import (
 	"log"
 	"net/http"
-	"ride-hail/internal/common/auth"
 	commonws "ride-hail/internal/common/websocket"
+	"ride-hail/internal/user/jwt"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -14,12 +14,15 @@ var Upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
-func PassengerWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hub) {
+func PassengerWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hub, jwtManager *jwt.Manager) {
 	conn, err := Upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		http.Error(w, "WebSocket upgrade failed", http.StatusInternalServerError)
 		return
 	}
+	defer conn.Close()
+
+	done := make(chan struct{})
 
 	// Устанавливаем таймауты и обработчик pong
 	conn.SetReadDeadline(time.Now().Add(60 * time.Second))
@@ -34,16 +37,16 @@ func PassengerWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hu
 		Token string `json:"token"`
 	}
 	if err := conn.ReadJSON(&authMsg); err != nil {
-		log.Printf("passenger WS user read error: %v", err)
-		conn.Close()
+		log.Printf("passenger WS read auth error: %v", err)
+		conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "auth failed"))
 		return
 	}
 
 	// Проверяем токен
-	userID, err := auth.ValidateToken(authMsg.Token)
+	userID, err := jwtManager.ValidateToken(authMsg.Token)
 	if err != nil {
-		conn.WriteJSON(map[string]string{"error": "invalid token"})
-		conn.Close()
+		log.Printf("invalid token for passenger: %v", err)
+		conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "invalid token"))
 		return
 	}
 
@@ -62,10 +65,12 @@ func PassengerWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hu
 		defer ticker.Stop()
 		for {
 			select {
+			case <-done:
+				return
 			case <-ticker.C:
-				if err := conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(10*time.Second)); err != nil {
+				err := conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(10*time.Second))
+				if err != nil {
 					log.Printf("ping failed for passenger %s: %v", userID, err)
-					conn.Close()
 					return
 				}
 			}
@@ -76,16 +81,20 @@ func PassengerWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hu
 	for {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
-			log.Printf("passenger %s disconnected: %v", userID, err)
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				log.Printf("passenger %s disconnected unexpectedly: %v", userID, err)
+			} else {
+				log.Printf("passenger %s disconnected", userID)
+			}
 			break
 		}
 
 		log.Printf("📨 Message from passenger %s: %s", userID, msg)
-		// можно просто сохранить сообщение в канал (если нужно)
 		hub.Broadcast <- msg
 	}
 
+	close(done)
 	hub.Unregister <- client
-	conn.Close()
+	conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "bye"))
 	log.Printf("🚪 Passenger connection closed: %s", userID)
 }

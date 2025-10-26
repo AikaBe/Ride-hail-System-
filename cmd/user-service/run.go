@@ -4,19 +4,17 @@ import (
 	"github.com/jackc/pgx/v5"
 	"net/http"
 	"ride-hail/internal/user/handler"
-	token "ride-hail/internal/user/jwt"
+	"ride-hail/internal/user/jwt"
 	"ride-hail/internal/user/repository"
 	"ride-hail/internal/user/service"
-	"time"
 )
 
-func RunUser(db *pgx.Conn, mux *http.ServeMux) {
+func RunUser(db *pgx.Conn, mux *http.ServeMux, jwtManager *jwt.Manager) {
 	userRepo := repository.NewUserRepository(db)
-	tokenManager := token.NewManager("supersecret", 15*time.Minute, 7*24*time.Hour)
-	authService := service.NewAuthService(userRepo, tokenManager)
+	authService := service.NewAuthService(userRepo, jwtManager)
 	authHandler := handler.NewAuthHandler(authService)
 
-	mux.HandleFunc("/register", authHandler.Register)
-	mux.HandleFunc("/login", authHandler.Login)
-	mux.HandleFunc("/refresh", authHandler.RefreshToken)
+	mux.HandleFunc("POST /register", authHandler.Register)
+	mux.HandleFunc("POST /login", authHandler.Login)
+	mux.HandleFunc("POST /refresh", authHandler.RefreshToken)
 }

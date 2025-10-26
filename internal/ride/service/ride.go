@@ -195,7 +195,7 @@ func (s *RideService) CreateRide(ctx context.Context, ride model.Ride, pickup, d
 		fmt.Printf("WARN: failed to publish ride.request event: %v\n", err)
 	}
 
-	return &ride, distanceKm, durationMin, nil
+	return createdRide, distanceKm, durationMin, nil
 }
 
 func (s *RideService) CancelRide(ctx context.Context, rideID, reason string) (*repository.CancelRideResponse, error) {
