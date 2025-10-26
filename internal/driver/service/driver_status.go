@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -21,7 +20,7 @@ type DriverRepository interface {
 	FindNearbyDrivers(ctx context.Context, pickup model.Location, vehicleType usermodel.VehicleType, radiusMeters float64) ([]model.DriverNearby, error)
 	SetOnline(ctx context.Context, driverID uuid.UUID, lat, lon float64) (model.DriverSession, error)
 	SetOffline(ctx context.Context, driverID uuid.UUID) (model.DriverSession, error)
-	Location(ctx context.Context, location model.LocationHistory) (model2.Coordinate, error)
+	SaveLocation(ctx context.Context, location model.LocationHistory) (model2.Coordinate, error)
 	Start(ctx context.Context, driverID uuid.UUID, rideID uuid.UUID, loc model.Location) (usermodel.DriverStatus, time.Time, error)
 	Complete(ctx context.Context, driverID uuid.UUID, driverEarning float64, location model.Location, distance, duration float64) (time.Time, error)
 	GetRideStatus(ctx context.Context, driverID, rideID uuid.UUID) (model2.RideStatus, error)
@@ -42,107 +41,76 @@ func NewDriverService(repo DriverRepository, rmqClient *rmq.Client, hub *websock
 	}
 }
 
-type RideEvent struct {
-	RideID      string `json:"ride_id"`
-	PassengerID string `json:"passenger_id"`
-	Pickup      string `json:"pickup"`
-	Dropoff     string `json:"dropoff"`
-}
-
 func (s *DriverService) ListenForRides(ctx context.Context, queueName string) {
 	err := s.rmqClient.ConsumeRideRequests(queueName, func(msg commonmq.RideRequestedMessage) {
-		log.Printf("🚕 Получен новый запрос поездки: %+v", msg)
+		log.Printf("🚕 Ride request received: %+v", msg)
 
-		pickup := model.Location{Latitude: msg.PickupLocation.Lat, Longitude: msg.PickupLocation.Lng}
-		vehicleType := msg.RideType
-
-		radius := 5_000.0
-		for {
-			drivers, err := s.repo.FindNearbyDrivers(ctx, pickup, vehicleType, radius)
-			if err != nil {
-				log.Printf(" Ошибка при поиске водителей: %v", err)
-				return
-			}
-
-			if len(drivers) > 0 {
-				log.Printf("Найдено %d водителей в радиусе %.0f м", len(drivers), radius)
-				s.sendRideOffers(drivers, msg)
-				return
-			}
-
-			if radius >= 15_000 {
-				log.Printf("Водителей не найдено даже в радиусе %.0f м", radius)
-				return
-			}
-
-			radius += 1_000
-			log.Printf("Увеличиваем радиус до %.0f м и пробуем снова...", radius)
-			time.Sleep(2 * time.Second)
-		}
+		// Вместо поиска рядом — просто всем подключённым водителям
+		s.wsHub.BroadcastRideOffer(msg)
 	})
-
 	if err != nil {
-		log.Fatalf("Ошибка при запуске ConsumeRideRequests: %v", err)
+		log.Fatalf("Failed to start consuming ride requests: %v", err)
 	}
 }
 
-func (s *DriverService) sendRideOffers(drivers []model.DriverNearby, msg commonmq.RideRequestedMessage) {
-	for _, d := range drivers {
-		data, _ := json.Marshal(msg)
-		s.wsHub.SendToClient(d.ID, data)
-		log.Printf(" Ride offer отправлено водителю %s (%.3f км)", d.ID, d.Distance)
-	}
-	timeout := time.After(30 * time.Second) // ⏰ Ограничение ожидания
-
-	for {
-		select {
-		case resp := <-s.wsHub.DriverResponses:
-			// Проверяем, что ответ относится к текущему заказу
-			if resp.RideID != msg.RideID {
-				continue
-			}
-
-			if resp.Accepted {
-				log.Printf("✅ Водитель %s принял заказ %s", resp.DriverID, resp.RideID)
-
-				// Уведомляем остальных водителей, что заказ занят
-				for _, d := range drivers {
-					if d.ID != resp.DriverID {
-						busyMsg := map[string]interface{}{
-							"type":    "ride_unavailable",
-							"ride_id": msg.RideID,
-						}
-						data, _ := json.Marshal(busyMsg)
-						s.wsHub.SendToClient(d.ID, data)
-					}
-				}
-
-				// Публикуем ответ водителя в брокер
-				_, err := s.HandleDriverResponse(
-					context.Background(),
-					resp.DriverID,
-					resp.RideID,
-					"", // offerID можно добавить позже
-					true,
-					resp.EstimatedArrivalMinutes,
-					commonmq.LatLng{},     // можно передавать реальные координаты
-					commonmq.DriverInfo{}, // можно дополнить
-				)
-				if err != nil {
-					log.Printf("⚠️ Ошибка публикации ответа водителя: %v", err)
-				}
-				return
-
-			} else {
-				log.Printf("🚫 Водитель %s отклонил заказ %s", resp.DriverID, resp.RideID)
-			}
-
-		case <-timeout:
-			log.Println("⏰ Время ожидания ответов от водителей истекло — никто не принял заказ")
-			return
-		}
-	}
-}
+//
+//func (s *DriverService) sendRideOffers(drivers []model.DriverNearby, msg commonmq.RideRequestedMessage) {
+//	for _, d := range drivers {
+//		data, _ := json.Marshal(msg)
+//		s.wsHub.SendToClient(d.ID, data)
+//		log.Printf(" Ride offer отправлено водителю %s (%.3f км)", d.ID, d.Distance)
+//	}
+//	timeout := time.After(30 * time.Second) // ⏰ Ограничение ожидания
+//
+//	for {
+//		select {
+//		case resp := <-s.wsHub.DriverResponses:
+//			// Проверяем, что ответ относится к текущему заказу
+//			if resp.RideID != msg.RideID {
+//				continue
+//			}
+//
+//			if resp.Accepted {
+//				log.Printf("✅ Водитель %s принял заказ %s", resp.DriverID, resp.RideID)
+//
+//				// Уведомляем остальных водителей, что заказ занят
+//				for _, d := range drivers {
+//					if d.ID != resp.DriverID {
+//						busyMsg := map[string]interface{}{
+//							"type":    "ride_unavailable",
+//							"ride_id": msg.RideID,
+//						}
+//						data, _ := json.Marshal(busyMsg)
+//						s.wsHub.SendToClient(d.ID, data)
+//					}
+//				}
+//
+//				// Публикуем ответ водителя в брокер
+//				_, err := s.HandleDriverResponse(
+//					context.Background(),
+//					resp.DriverID,
+//					resp.RideID,
+//					"", // offerID можно добавить позже
+//					true,
+//					resp.EstimatedArrivalMinutes,
+//					commonmq.LatLng{},     // можно передавать реальные координаты
+//					commonmq.DriverInfo{}, // можно дополнить
+//				)
+//				if err != nil {
+//					log.Printf("⚠️ Ошибка публикации ответа водителя: %v", err)
+//				}
+//				return
+//
+//			} else {
+//				log.Printf("🚫 Водитель %s отклонил заказ %s", resp.DriverID, resp.RideID)
+//			}
+//
+//		case <-timeout:
+//			log.Println("⏰ Время ожидания ответов от водителей истекло — никто не принял заказ")
+//			return
+//		}
+//	}
+//}
 
 // HandleDriverResponse публикует ответ водителя (accept/decline) в брокер.
 func (s *DriverService) HandleDriverResponse(
@@ -215,7 +183,7 @@ func (s *DriverService) GoOffline(ctx context.Context, driverID uuid.UUID) (mode
 	return session, durationHours, nil
 }
 
-func (s *DriverService) Location(ctx context.Context, location model.LocationHistory) (model2.Coordinate, error) {
+func (s *DriverService) UpdateLocation(ctx context.Context, location model.LocationHistory) (model2.Coordinate, error) {
 	if location.Latitude < -90 || location.Latitude > 90 {
 		return model2.Coordinate{}, errors.New("latitude out of range")
 	}
@@ -231,6 +199,7 @@ func (s *DriverService) Location(ctx context.Context, location model.LocationHis
 	if location.HeadingDegrees < 0 || location.HeadingDegrees > 360 {
 		return model2.Coordinate{}, errors.New("invalid heading")
 	}
+
 	driverStatus, err := s.repo.GetDriverStatus(ctx, uuid.UUID(location.DriverID))
 	if err != nil {
 		return model2.Coordinate{}, err
@@ -238,7 +207,24 @@ func (s *DriverService) Location(ctx context.Context, location model.LocationHis
 	if driverStatus == "OFFLINE" {
 		return model2.Coordinate{}, errors.New("driver is OFFLINE")
 	}
-	return s.repo.Location(ctx, location)
+
+	coord, err := s.repo.SaveLocation(ctx, location)
+	if err != nil {
+		return model2.Coordinate{}, err
+	}
+
+	msg := commonmq.LocationUpdateMessage{
+		DriverID: string(coord.EntityID),
+		//RideID:    rideID,
+		Location:  commonmq.LatLng{Lat: coord.Latitude, Lng: coord.Longitude},
+		SpeedKmh:  location.SpeedKmh,
+		Heading:   location.HeadingDegrees,
+		Timestamp: coord.UpdatedAt.UTC(),
+	}
+	if err := s.rmqClient.PublishLocationUpdate(ctx, msg); err != nil {
+		log.Printf("⚠️ Failed to publish driver location: %v", err)
+	}
+	return coord, err
 }
 
 func (s *DriverService) Start(ctx context.Context, driverID uuid.UUID, rideId uuid.UUID, location model.Location) (dto.StartResponse, error) {

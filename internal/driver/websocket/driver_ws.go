@@ -40,7 +40,7 @@ func DriverWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hub, 
 		Token string `json:"token"`
 	}
 	if err := conn.ReadJSON(&authMsg); err != nil {
-		log.Printf("passenger WS user read error: %v", err)
+		log.Printf("Driver WS user read error: %v", err)
 		conn.Close()
 		return
 	}
@@ -55,12 +55,26 @@ func DriverWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hub, 
 
 	// Создаем клиента и регистрируем в Hub
 	client := &commonws.Client{
-		ID:   "passenger_" + claims.UserID,
+		ID:   "driver_" + claims.UserID,
 		Conn: conn,
 		Send: make(chan []byte, 256),
 	}
 	hub.Register <- client
-	log.Printf("🧍‍♀️ Passenger connected: %s", claims)
+
+	// Отправка сообщений из hub.Send в WebSocket
+	go func() {
+		for msg := range client.Send {
+			if err := client.Conn.WriteMessage(websocket.TextMessage, msg); err != nil {
+				log.Printf("Ошибка отправки драйверу %s: %v", client.ID, err)
+				break
+			}
+		}
+	}()
+
+	// Чтение сообщений от водителя
+	go hub.ListenClientMessages(client)
+
+	log.Printf("🧍‍♀️ Driver connected: %s", claims)
 
 	// Периодически отправляем Ping
 	go func() {
@@ -82,16 +96,16 @@ func DriverWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hub, 
 	for {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
-			log.Printf("passenger %s disconnected: %v", claims, err)
+			log.Printf("Driver %s disconnected: %v", claims, err)
 			break
 		}
 
-		log.Printf("📨 Message from passenger %s: %s", claims, msg)
+		log.Printf("📨 Message from driver %s: %s", claims, msg)
 		// можно просто сохранить сообщение в канал (если нужно)
 		hub.Broadcast <- msg
 	}
 
 	hub.Unregister <- client
 	conn.Close()
-	log.Printf("🚪 Passenger connection closed: %s", claims)
+	log.Printf("🚪 Driver connection closed: %s", claims)
 }

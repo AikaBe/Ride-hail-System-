@@ -31,7 +31,7 @@ func RunDriver(cfg *config.Config, conn *pgx.Conn, commonMq *commonrmq.RabbitMQ,
 	h := handler.NewHandler(svc)
 	mux.HandleFunc("POST /drivers/{driver_id}/online", h.GoOnline)
 	mux.HandleFunc("POST /drivers/{driver_id}/offline", h.GoOffline)
-	mux.HandleFunc("POST /drivers/{driver_id}/location", h.Location)
+	mux.HandleFunc("POST /drivers/{driver_id}/location", h.UpdateLocation)
 	mux.HandleFunc("POST /drivers/{driver_id}/start", h.Start)
 	mux.HandleFunc("POST /drivers/{driver_id}/complete", h.Complete)
 }

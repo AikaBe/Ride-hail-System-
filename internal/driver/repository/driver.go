@@ -149,7 +149,7 @@ func (r *DriverRepository) SetOffline(ctx context.Context, driverID uuid.UUID) (
 	return session, nil
 }
 
-func (r *DriverRepository) Location(ctx context.Context, location model.LocationHistory) (ridemodel.Coordinate, error) {
+func (r *DriverRepository) SaveLocation(ctx context.Context, location model.LocationHistory) (ridemodel.Coordinate, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return ridemodel.Coordinate{}, err

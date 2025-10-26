@@ -80,7 +80,7 @@ func (h *DriverHandler) GoOffline(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *DriverHandler) Location(w http.ResponseWriter, r *http.Request) {
+func (h *DriverHandler) UpdateLocation(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	driverID := r.PathValue("driver_id")
 
@@ -99,7 +99,7 @@ func (h *DriverHandler) Location(w http.ResponseWriter, r *http.Request) {
 		HeadingDegrees: req.HeadingDegrees,
 	}
 
-	resp, err := h.service.Location(ctx, location)
+	resp, err := h.service.UpdateLocation(ctx, location)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

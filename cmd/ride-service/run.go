@@ -26,7 +26,7 @@ func RunRide(cfg *config.Config, conn *pgx.Conn, commonMq *commonrmq.RabbitMQ, m
 	service := service.NewRideManager(repo, rmqClient, hub)
 	handler := ridehttp.NewRideHandler(service)
 
-	go service.ListenForRides(context.Background(), "driver_responses")
+	go service.ListenForDriver(context.Background(), "driver_responses")
 
 	mux.HandleFunc("POST /rides", handler.CreateRide)
 	mux.HandleFunc("POST /rides/{ride_id}/cancel", handler.CancelRide)

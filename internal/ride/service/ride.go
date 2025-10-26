@@ -15,7 +15,6 @@ import (
 
 	"ride-hail/internal/ride/repository"
 	rmqClient "ride-hail/internal/ride/rmq"
-	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -40,26 +39,19 @@ func NewRideManager(repo RideRepository, mq *rmqClient.Client, wsHub *websocket.
 	return &RideService{repo: repo, mq: mq, wsHub: wsHub}
 }
 
-func (s *RideService) ListenForRides(ctx context.Context, queueName string) {
+func (s *RideService) ListenForDriver(ctx context.Context, queueName string) {
 	err := s.mq.ConsumeDriverResponses(queueName, func(msg common.DriverResponseMessage) {
 		log.Printf("📨 Получен ответ от водителя %s по заказу %s (accepted=%v)",
 			msg.DriverID, msg.RideID, msg.Accepted)
 
 		// 🟢 Если водитель принял заказ
 		if msg.Accepted {
-
-			// Формируем сообщение пассажиру
-
 			data, _ := json.Marshal(msg)
 
-			// Отправляем всем пассажирам (или конкретному, если знаем ID)
-			for _, c := range s.wsHub.Clients {
-				if strings.HasPrefix(c.ID, "passenger_") { // условие, если ID формируется по типу
-					s.wsHub.SendToClient(c.ID, data)
-				}
-			}
+			passengerID := "passenger_" + msg.RideID
 
-			log.Printf("✅ Отправлено обновление пассажирам о принятии поездки %s водителем %s", msg.RideID, msg.DriverID)
+			log.Printf("📤 Отправка пассажиру %s: %s", passengerID, string(data))
+			s.wsHub.SendToClient(passengerID, data)
 		} else {
 			// 🟥 Если водитель отклонил
 			log.Printf("🚫 Водитель %s отклонил поездку %s", msg.DriverID, msg.RideID)
@@ -173,7 +165,7 @@ func (s *RideService) CreateRide(ctx context.Context, ride model.Ride, pickup, d
 	}
 
 	message := common.RideRequestedMessage{
-		RideID:     string(ride.ID),
+		RideID:     string(createdRide.ID),
 		RideNumber: rideNumber,
 		PickupLocation: common.Location{
 			Lat:     pickup.Latitude,
@@ -185,10 +177,10 @@ func (s *RideService) CreateRide(ctx context.Context, ride model.Ride, pickup, d
 			Lng:     destination.Longitude,
 			Address: destination.Address,
 		},
-		RideType:       *ride.VehicleType,
+		RideType:       *createdRide.VehicleType,
 		MaxDistanceKm:  distanceKm,
 		TimeoutSeconds: 30,
-		CorrelationID:  string(ride.ID),
+		CorrelationID:  string(createdRide.ID),
 	}
 
 	if err := s.mq.PublishRideRequested(ctx, message); err != nil {
