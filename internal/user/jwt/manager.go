@@ -84,19 +84,18 @@ func (m *Manager) ParseToken(tokenStr string) (*Claims, error) {
 	return nil, jwt.ErrSignatureInvalid
 }
 
-func (m *Manager) ValidateToken(tokenString string) (string, error) {
+func (m *Manager) ValidateToken(tokenString string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
-		return m.secretKey, nil
+		return []byte(m.secretKey), nil
 	})
-
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	claims, ok := token.Claims.(*Claims)
 	if !ok || !token.Valid {
-		return "", errors.New("invalid token")
+		return nil, errors.New("invalid token")
 	}
 
-	return claims.UserID, nil
+	return claims, nil
 }

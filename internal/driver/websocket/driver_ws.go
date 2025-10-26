@@ -46,7 +46,7 @@ func DriverWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hub, 
 	}
 
 	// Проверяем токен
-	userID, err := jwtManager.ValidateToken(authMsg.Token)
+	claims, err := jwtManager.ValidateToken(authMsg.Token)
 	if err != nil {
 		conn.WriteJSON(map[string]string{"error": "invalid token"})
 		conn.Close()
@@ -55,12 +55,12 @@ func DriverWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hub, 
 
 	// Создаем клиента и регистрируем в Hub
 	client := &commonws.Client{
-		ID:   "passenger_" + userID,
+		ID:   "passenger_" + claims.UserID,
 		Conn: conn,
 		Send: make(chan []byte, 256),
 	}
 	hub.Register <- client
-	log.Printf("🧍‍♀️ Passenger connected: %s", userID)
+	log.Printf("🧍‍♀️ Passenger connected: %s", claims)
 
 	// Периодически отправляем Ping
 	go func() {
@@ -70,7 +70,7 @@ func DriverWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hub, 
 			select {
 			case <-ticker.C:
 				if err := conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(10*time.Second)); err != nil {
-					log.Printf("ping failed for passenger %s: %v", userID, err)
+					log.Printf("ping failed for passenger %s: %v", claims, err)
 					conn.Close()
 					return
 				}
@@ -82,16 +82,16 @@ func DriverWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hub, 
 	for {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
-			log.Printf("passenger %s disconnected: %v", userID, err)
+			log.Printf("passenger %s disconnected: %v", claims, err)
 			break
 		}
 
-		log.Printf("📨 Message from passenger %s: %s", userID, msg)
+		log.Printf("📨 Message from passenger %s: %s", claims, msg)
 		// можно просто сохранить сообщение в канал (если нужно)
 		hub.Broadcast <- msg
 	}
 
 	hub.Unregister <- client
 	conn.Close()
-	log.Printf("🚪 Passenger connection closed: %s", userID)
+	log.Printf("🚪 Passenger connection closed: %s", claims)
 }

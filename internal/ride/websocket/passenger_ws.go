@@ -43,7 +43,7 @@ func PassengerWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hu
 	}
 
 	// Проверяем токен
-	userID, err := jwtManager.ValidateToken(authMsg.Token)
+	claims, err := jwtManager.ValidateToken(authMsg.Token)
 	if err != nil {
 		log.Printf("invalid token for passenger: %v", err)
 		conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "invalid token"))
@@ -52,12 +52,12 @@ func PassengerWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hu
 
 	// Создаем клиента и регистрируем в Hub
 	client := &commonws.Client{
-		ID:   "passenger_" + userID,
+		ID:   "passenger_" + claims.UserID,
 		Conn: conn,
 		Send: make(chan []byte, 256),
 	}
 	hub.Register <- client
-	log.Printf("🧍‍♀️ Passenger connected: %s", userID)
+	log.Printf("🧍‍♀️ Passenger connected: %s", claims.UserID)
 
 	// Периодически отправляем Ping
 	go func() {
@@ -70,7 +70,7 @@ func PassengerWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hu
 			case <-ticker.C:
 				err := conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(10*time.Second))
 				if err != nil {
-					log.Printf("ping failed for passenger %s: %v", userID, err)
+					log.Printf("ping failed for passenger %s: %v", claims.UserID, err)
 					return
 				}
 			}
@@ -82,19 +82,19 @@ func PassengerWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hu
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("passenger %s disconnected unexpectedly: %v", userID, err)
+				log.Printf("passenger %s disconnected unexpectedly: %v", claims.UserID, err)
 			} else {
-				log.Printf("passenger %s disconnected", userID)
+				log.Printf("passenger %s disconnected", claims.UserID)
 			}
 			break
 		}
 
-		log.Printf("📨 Message from passenger %s: %s", userID, msg)
+		log.Printf("📨 Message from passenger %s: %s", claims.UserID, msg)
 		hub.Broadcast <- msg
 	}
 
 	close(done)
 	hub.Unregister <- client
 	conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "bye"))
-	log.Printf("🚪 Passenger connection closed: %s", userID)
+	log.Printf("🚪 Passenger connection closed: %s", claims.UserID)
 }
