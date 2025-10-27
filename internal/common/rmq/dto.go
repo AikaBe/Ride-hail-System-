@@ -76,3 +76,17 @@ type RideStatusUpdateMessage struct {
 	Status  string `json:"status"`
 	Message string `json:"message,omitempty"`
 }
+type PassiNFO struct {
+	Type           string         `json:"type"`            // тип сообщения, например "ride_details"
+	RideID         string         `json:"ride_id"`         // ID поездки
+	PassengerName  string         `json:"passenger_name"`  // имя пассажира
+	PassengerPhone string         `json:"passenger_phone"` // телефон пассажира
+	PickupLocation PickupLocation `json:"pickup_location"` // место посадки
+}
+
+type PickupLocation struct {
+	Latitude  float64 `json:"latitude"`  // широта
+	Longitude float64 `json:"longitude"` // долгота
+	Address   string  `json:"address"`   // адрес
+	Notes     string  `json:"notes"`     // примечания (например, "у главного входа")
+}

@@ -40,3 +40,27 @@ type DriverNearby struct {
 	Longitude float64 `json:"longitude"`
 	Distance  float64 `json:"distance_km"`
 }
+type DriverResponceWS struct {
+	Type            string `json:"type"`     // тип сообщения (например, "ride_response")
+	OfferID         string `json:"offer_id"` // ID предложения
+	RideID          string `json:"ride_id"`  // ID поездки
+	DriverID        string `json:"driver_id"`
+	Accepted        bool   `json:"accepted"` // принял ли водитель заказ
+	CurrentLocation struct {
+		Latitude  float64 `json:"latitude"`  // широта
+		Longitude float64 `json:"longitude"` // долгота
+	} `json:"current_location"`
+}
+
+type DriverInfo struct {
+	Name    string  `json:"name"`
+	Rating  float64 `json:"rating"`
+	Vehicle Vehicle `json:"vehicle"`
+}
+
+type Vehicle struct {
+	Make  string `json:"make"`
+	Model string `json:"uuid"`
+	Color string `json:"color"`
+	Plate string `json:"plate"`
+}

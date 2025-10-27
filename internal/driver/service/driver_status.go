@@ -2,9 +2,11 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	commonmq "ride-hail/internal/common/rmq"
 	"ride-hail/internal/common/websocket"
 	"ride-hail/internal/driver/handler/dto"
@@ -25,6 +27,9 @@ type DriverRepository interface {
 	Complete(ctx context.Context, driverID uuid.UUID, driverEarning float64, location model.Location, distance, duration float64) (time.Time, error)
 	GetRideStatus(ctx context.Context, driverID, rideID uuid.UUID) (model2.RideStatus, error)
 	GetDriverStatus(ctx context.Context, driverID uuid.UUID) (usermodel.DriverStatus, error)
+	GetInfo(ctx context.Context, id string) (model.DriverInfo, error)
+	GetPickupLocation(ctx context.Context, rideID string) (float64, float64, error)
+	GetDriverIDByRideID(ctx context.Context, rideID string) (string, error)
 }
 
 type DriverService struct {
@@ -53,101 +58,129 @@ func (s *DriverService) ListenForRides(ctx context.Context, queueName string) {
 	}
 }
 
-//
-//func (s *DriverService) sendRideOffers(drivers []model.DriverNearby, msg commonmq.RideRequestedMessage) {
-//	for _, d := range drivers {
-//		data, _ := json.Marshal(msg)
-//		s.wsHub.SendToClient(d.ID, data)
-//		log.Printf(" Ride offer отправлено водителю %s (%.3f км)", d.ID, d.Distance)
-//	}
-//	timeout := time.After(30 * time.Second) // ⏰ Ограничение ожидания
-//
-//	for {
-//		select {
-//		case resp := <-s.wsHub.DriverResponses:
-//			// Проверяем, что ответ относится к текущему заказу
-//			if resp.RideID != msg.RideID {
-//				continue
-//			}
-//
-//			if resp.Accepted {
-//				log.Printf("✅ Водитель %s принял заказ %s", resp.DriverID, resp.RideID)
-//
-//				// Уведомляем остальных водителей, что заказ занят
-//				for _, d := range drivers {
-//					if d.ID != resp.DriverID {
-//						busyMsg := map[string]interface{}{
-//							"type":    "ride_unavailable",
-//							"ride_id": msg.RideID,
-//						}
-//						data, _ := json.Marshal(busyMsg)
-//						s.wsHub.SendToClient(d.ID, data)
-//					}
-//				}
-//
-//				// Публикуем ответ водителя в брокер
-//				_, err := s.HandleDriverResponse(
-//					context.Background(),
-//					resp.DriverID,
-//					resp.RideID,
-//					"", // offerID можно добавить позже
-//					true,
-//					resp.EstimatedArrivalMinutes,
-//					commonmq.LatLng{},     // можно передавать реальные координаты
-//					commonmq.DriverInfo{}, // можно дополнить
-//				)
-//				if err != nil {
-//					log.Printf("⚠️ Ошибка публикации ответа водителя: %v", err)
-//				}
-//				return
-//
-//			} else {
-//				log.Printf("🚫 Водитель %s отклонил заказ %s", resp.DriverID, resp.RideID)
-//			}
-//
-//		case <-timeout:
-//			log.Println("⏰ Время ожидания ответов от водителей истекло — никто не принял заказ")
-//			return
-//		}
-//	}
-//}
+func (s *DriverService) ListenForPassengers(ctx context.Context, queueName string) {
+	err := s.rmqClient.ConsumePassengerInfo(queueName, func(msg commonmq.PassiNFO) {
+		log.Printf("📨 Получен ответ от пасажира по заказу %s ", msg.RideID)
 
-// HandleDriverResponse публикует ответ водителя (accept/decline) в брокер.
-func (s *DriverService) HandleDriverResponse(
-	ctx context.Context,
-	driverID string,
-	rideID string,
-	offerID string,
-	accepted bool,
-	arrivalMinutes int,
-	driverLocation commonmq.LatLng,
-	driverInfo commonmq.DriverInfo,
-) (commonmq.DriverResponseMessage, error) {
-	resp := commonmq.DriverResponseMessage{
-		RideID:                  rideID,
-		OfferID:                 offerID,
-		DriverID:                driverID,
-		Accepted:                accepted,
-		EstimatedArrivalMinutes: arrivalMinutes,
-		DriverLocation:          driverLocation,
-		DriverInfo:              driverInfo,
-		EstimatedArrival:        time.Now().Add(time.Duration(arrivalMinutes) * time.Minute),
-		RespondedAt:             time.Now(),
+		data, _ := json.Marshal(msg)
+		DriverID, err := s.repo.GetDriverIDByRideID(ctx, msg.RideID)
+		if err != nil {
+			log.Println(err)
+		}
+		driverId := "driver_" + DriverID
+		log.Printf("Отправка водителю %s: %s", DriverID, string(data))
+		s.wsHub.SendToClient(driverId, data)
+	})
+
+	if err != nil {
+		log.Printf("Ошибка при чтении сообщений очереди %s: %v", queueName, err)
 	}
+}
 
-	// Публикуем сообщение в RabbitMQ
-	if err := s.rmqClient.PublishDriverResponse(ctx, resp); err != nil {
-		return resp, fmt.Errorf("failed to publish driver response: %w", err)
+func (s *DriverService) SendToMq(ctx context.Context) {
+	log.Println("🛰️ Listening for driver responses from WebSocket...")
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Println("Stopped listening for driver responses.")
+			return
+
+		case resp := <-s.wsHub.DriverResponses:
+			log.Printf(" Received driver response from WS: %+v", resp)
+			driverInfo, err := s.repo.GetInfo(ctx, resp.DriverID)
+			if err != nil {
+
+			}
+			pickupLat, pickupLng, err := s.repo.GetPickupLocation(ctx, resp.RideID)
+			if err != nil {
+				log.Printf("❌ Не удалось получить координаты подачи: %v", err)
+				continue
+			}
+
+			estimatedMinutes, estimatedArrival := estimateArrival(
+				resp.CurrentLocation.Latitude,
+				resp.CurrentLocation.Longitude,
+				pickupLat,
+				pickupLng,
+			)
+			msg := commonmq.DriverResponseMessage{
+				RideID:                  resp.RideID,
+				OfferID:                 resp.OfferID,
+				DriverID:                resp.DriverID,
+				Accepted:                resp.Accepted,
+				EstimatedArrivalMinutes: estimatedMinutes,
+				DriverLocation: commonmq.LatLng{
+					Lat: resp.CurrentLocation.Latitude,
+					Lng: resp.CurrentLocation.Longitude,
+				},
+				DriverInfo: commonmq.DriverInfo{
+					Name:   driverInfo.Name,
+					Rating: driverInfo.Rating,
+					Vehicle: commonmq.Vehicle{
+						Make:  driverInfo.Vehicle.Make,
+						Model: driverInfo.Vehicle.Model,
+						Color: driverInfo.Vehicle.Color,
+						Plate: driverInfo.Vehicle.Plate,
+					},
+				},
+				EstimatedArrival: estimatedArrival,
+				RespondedAt:      time.Now(),
+			}
+
+			// Отправляем в MQ
+			err = s.rmqClient.PublishDriverResponse(ctx, msg)
+			if err != nil {
+				log.Printf("❗ Failed to send driver response to MQ: %v", err)
+			} else {
+				log.Printf("✅ Sent driver response to MQ: %+v", msg)
+			}
+		}
 	}
+}
 
-	status := "declined"
-	if accepted {
-		status = "accepted"
+func (s *DriverService) UpdateLocationWS(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			log.Println("Stopped listening for driver responses.")
+			return
+
+		case resp := <-s.wsHub.UpdateLocation:
+			log.Printf(" Received driver response from WS: %+v", resp)
+
+			// Отправляем в MQ
+			err := s.rmqClient.PublishLocationUpdate(ctx, resp)
+			if err != nil {
+				log.Printf("❗ Failed to update location: %v", err)
+			} else {
+				log.Printf("✅ Sent driver update location: %+v", resp)
+			}
+		}
 	}
-	log.Printf("Водитель %s %s поездку %s (offer: %s, прибытие через %d мин)",
-		driverID, status, rideID, offerID, arrivalMinutes)
+}
 
-	return resp, nil
+func calculateDistanceKm(lat1, lon1, lat2, lon2 float64) float64 {
+	const R = 6371 // радиус Земли в км
+	dLat := (lat2 - lat1) * math.Pi / 180
+	dLon := (lon2 - lon1) * math.Pi / 180
+
+	a := math.Sin(dLat/2)*math.Sin(dLat/2) +
+		math.Cos(lat1*math.Pi/180)*math.Cos(lat2*math.Pi/180)*
+			math.Sin(dLon/2)*math.Sin(dLon/2)
+
+	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
+	return R * c
+}
+func estimateArrival(driverLat, driverLng, pickupLat, pickupLng float64) (int, time.Time) {
+	distanceKm := calculateDistanceKm(driverLat, driverLng, pickupLat, pickupLng)
+	speedKmH := 40.0
+
+	hours := distanceKm / speedKmH
+	minutes := int(hours * 60)
+
+	estimatedArrival := time.Now().Add(time.Duration(minutes) * time.Minute)
+	return minutes, estimatedArrival
 }
 
 func (s *DriverService) GoOnline(ctx context.Context, driverID uuid.UUID, lat, lon float64) (model.DriverSession, error) {
@@ -316,4 +349,12 @@ func (s *DriverService) Complete(ctx context.Context, driverID uuid.UUID, req dt
 		Message:       "Ride completed successfully",
 	}
 	return resp, nil
+}
+
+func (s *DriverService) GetDriverInfo(ctx context.Context, driverID string) (model.DriverInfo, error) {
+	responce, err := s.repo.GetInfo(ctx, driverID)
+	if err != nil {
+		return model.DriverInfo{}, err
+	}
+	return responce, nil
 }

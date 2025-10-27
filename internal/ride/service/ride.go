@@ -25,8 +25,9 @@ type RideRepository interface {
 	InsertRideEvent(ctx context.Context, tx pgx.Tx, event model.RideEvent) error
 	InsertCoordinate(ctx context.Context, tx pgx.Tx, coordinate model.Coordinate) (string, error)
 	CancelRide(ctx context.Context, rideID, reason string) (*repository.CancelRideResponse, error)
-
+	GetPassengerIDByRideID(ctx context.Context, rideID string) (string, error)
 	BeginTx(ctx context.Context) (pgx.Tx, error)
+	UpdateRideStatusMatched(ctx context.Context, rideID string, driverID string) error
 }
 
 type RideService struct {
@@ -48,10 +49,21 @@ func (s *RideService) ListenForDriver(ctx context.Context, queueName string) {
 		if msg.Accepted {
 			data, _ := json.Marshal(msg)
 
-			passengerID := "passenger_" + msg.RideID
-
-			log.Printf("📤 Отправка пассажиру %s: %s", passengerID, string(data))
-			s.wsHub.SendToClient(passengerID, data)
+			passengerID, err := s.repo.GetPassengerIDByRideID(ctx, msg.RideID)
+			if err != nil {
+				log.Println(err)
+			}
+			passId := "passenger_" + passengerID
+			log.Printf("Отправка пассажиру %s: %s", passengerID, string(data))
+			s.wsHub.SendToClient(passId, data)
+			err = s.repo.UpdateRideStatusMatched(ctx, msg.RideID, msg.DriverID)
+			if err != nil {
+				log.Println(err)
+			}
+			go s.SendPassInfo(ctx)
+			if err != nil {
+				log.Println(err)
+			}
 		} else {
 			// 🟥 Если водитель отклонил
 			log.Printf("🚫 Водитель %s отклонил поездку %s", msg.DriverID, msg.RideID)
@@ -63,6 +75,48 @@ func (s *RideService) ListenForDriver(ctx context.Context, queueName string) {
 	}
 }
 
+func (s *RideService) SendPassInfo(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			log.Println("Stopped listening for passenger responses.")
+			return
+
+		case resp := <-s.wsHub.PassengerResponses:
+			log.Printf(" Received passenger response from WS: %+v", resp)
+
+			// Отправляем в MQ
+			err := s.mq.PublishPassengerInfo(ctx, resp)
+			if err != nil {
+				log.Printf("Failed to send passenger response to MQ: %v", err)
+			} else {
+				log.Printf("Sent passenger response to MQ: %+v", resp)
+			}
+		}
+	}
+}
+
+func (s *RideService) LocationUpdate(ctx context.Context, queueName string) {
+	err := s.mq.ConsumeLocationUpdates(queueName, func(msg common.LocationUpdateMessage) {
+		log.Printf("📨 геолокация изменилась %s по заказу %s ",
+			msg.DriverID, msg.RideID)
+
+		data, _ := json.Marshal(msg)
+
+		passengerID, err := s.repo.GetPassengerIDByRideID(ctx, msg.RideID)
+		if err != nil {
+			log.Println(err)
+		}
+		passId := "passenger_" + passengerID
+		log.Printf("Отправка пассажиру %s: %s", passengerID, string(data))
+		s.wsHub.SendToClient(passId, data)
+	})
+
+	if err != nil {
+		log.Printf("Ошибка при чтении сообщений очереди %s: %v", queueName, err)
+	}
+
+}
 func (s *RideService) CreateRide(ctx context.Context, ride model.Ride, pickup, destination model.Coordinate) (*model.Ride, float64, int, error) {
 	if err := s.validateRideRequest(ride); err != nil {
 		return nil, 0, 0, err

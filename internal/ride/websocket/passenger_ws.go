@@ -57,6 +57,7 @@ func PassengerWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hu
 		Send: make(chan []byte, 256),
 	}
 	hub.Register <- client
+
 	log.Printf("🧍‍♀️ Passenger connected: %s", claims.UserID)
 
 	// Периодически отправляем Ping
@@ -77,6 +78,15 @@ func PassengerWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hu
 		}
 	}()
 
+	go func() {
+		for msg := range client.Send {
+			if err := client.Conn.WriteMessage(websocket.TextMessage, msg); err != nil {
+				log.Printf("Ошибка отправки драйверу %s: %v", client.ID, err)
+				break
+			}
+		}
+	}()
+	//go hub.ListenPassengerMessages(client)
 	// Читаем входящие сообщения (например, подтверждения или чаты)
 	for {
 		_, msg, err := conn.ReadMessage()

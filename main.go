@@ -55,9 +55,9 @@ func main() {
 
 	mux := http.NewServeMux()
 
+	cmdUser.RunUser(pg.Conn, mux, jwtManager)
 	cmdRide.RunRide(cfg, pg.Conn, commonRMQ, mux, hub)
 	cmdDriver.RunDriver(cfg, pg.Conn, commonRMQ, mux, hub)
-	cmdUser.RunUser(pg.Conn, mux, jwtManager)
 
 	wsMux := http.NewServeMux()
 

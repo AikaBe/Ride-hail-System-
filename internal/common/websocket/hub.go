@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"ride-hail/internal/common/rmq"
+	DriverModel "ride-hail/internal/driver/model"
 	"strings"
 	"sync"
 
@@ -16,21 +17,25 @@ type Client struct {
 	Send chan []byte
 }
 type Hub struct {
-	Clients         map[string]*Client
-	mu              sync.RWMutex
-	Register        chan *Client
-	Unregister      chan *Client
-	Broadcast       chan []byte
-	DriverResponses chan rmq.DriverResponseMessage
+	Clients            map[string]*Client
+	Mu                 sync.RWMutex
+	Register           chan *Client
+	Unregister         chan *Client
+	Broadcast          chan []byte
+	DriverResponses    chan DriverModel.DriverResponceWS
+	PassengerResponses chan rmq.PassiNFO
+	UpdateLocation     chan rmq.LocationUpdateMessage
 }
 
 func NewHub() *Hub {
 	return &Hub{
-		Clients:         make(map[string]*Client),
-		Register:        make(chan *Client),
-		Unregister:      make(chan *Client),
-		Broadcast:       make(chan []byte),
-		DriverResponses: make(chan rmq.DriverResponseMessage, 10),
+		Clients:            make(map[string]*Client),
+		Register:           make(chan *Client),
+		Unregister:         make(chan *Client),
+		Broadcast:          make(chan []byte),
+		DriverResponses:    make(chan DriverModel.DriverResponceWS, 10),
+		PassengerResponses: make(chan rmq.PassiNFO, 10),
+		UpdateLocation:     make(chan rmq.LocationUpdateMessage, 10),
 	}
 }
 
@@ -38,42 +43,40 @@ func (h *Hub) Run() {
 	for {
 		select {
 		case client := <-h.Register:
-			h.mu.Lock()
+			h.Mu.Lock()
 			h.Clients[client.ID] = client
-			h.mu.Unlock()
+			h.Mu.Unlock()
 		case client := <-h.Unregister:
-			h.mu.Lock()
+			h.Mu.Lock()
 			delete(h.Clients, client.ID)
-			close(client.Send)
-			h.mu.Unlock()
+			h.Mu.Unlock()
 		case message := <-h.Broadcast:
-			h.mu.RLock()
+			h.Mu.RLock()
 			for _, c := range h.Clients {
 				select {
 				case c.Send <- message:
 				default:
-					close(c.Send)
-					delete(h.Clients, c.ID)
+					log.Printf("⚠️ Client %s send buffer full", c)
 				}
 			}
-			h.mu.RUnlock()
+			h.Mu.RUnlock()
 		}
 	}
 }
+
 func (h *Hub) SendToClient(clientID string, message []byte) {
-	h.mu.RLock()
+	h.Mu.RLock()
 	client, ok := h.Clients[clientID]
-	h.mu.RUnlock()
+	h.Mu.RUnlock()
 	if ok {
 		select {
 		case client.Send <- message:
 			log.Printf("✅ Сообщение отправлено клиенту %s: %s", clientID, string(message))
 		default:
 			log.Printf("⚠️ Канал переполнен, отключаем клиента %s", clientID)
-			h.mu.Lock()
-			close(client.Send)
-			delete(h.Clients, clientID)
-			h.mu.Unlock()
+			go func() {
+				h.Unregister <- client
+			}()
 		}
 	} else {
 		log.Printf("❌ Клиент %s не найден в Hub", clientID)
@@ -83,8 +86,8 @@ func (h *Hub) SendToClient(clientID string, message []byte) {
 func (h *Hub) BroadcastRideOffer(msg rmq.RideRequestedMessage) {
 	data, _ := json.Marshal(msg)
 
-	h.mu.RLock()
-	defer h.mu.RUnlock()
+	h.Mu.RLock()
+	defer h.Mu.RUnlock()
 
 	for _, client := range h.Clients {
 		if strings.HasPrefix(client.ID, "driver_") {
@@ -93,30 +96,60 @@ func (h *Hub) BroadcastRideOffer(msg rmq.RideRequestedMessage) {
 				log.Printf("📨 Ride offer sent to driver %s for ride %s", client.ID, msg.RideID)
 			default:
 				log.Printf("⚠️ Channel full, disconnecting driver %s", client.ID)
-				close(client.Send)
-				h.mu.RUnlock()
-				h.mu.Lock()
-				delete(h.Clients, client.ID)
-				h.mu.Unlock()
-				h.mu.RLock()
+				go func(c *Client) { h.Unregister <- c }(client)
 			}
 		}
 	}
 }
 
-func (h *Hub) ListenClientMessages(client *Client) {
+func (h *Hub) ListenDriverMessages(client *Client) {
 	for {
 		_, msg, err := client.Conn.ReadMessage()
 		if err != nil {
 			log.Printf("Ошибка чтения от %s: %v", client.ID, err)
-			h.Unregister <- client
 			return
 		}
 
-		var resp rmq.DriverResponseMessage
+		var resp DriverModel.DriverResponceWS
 		if err := json.Unmarshal(msg, &resp); err == nil {
 			resp.DriverID = client.ID // на всякий случай
 			h.DriverResponses <- resp // отправляем в канал ответов
+			log.Printf("📩 Ответ от водителя %s: %+v", client.ID, resp)
+		} else {
+			log.Printf("⚠️ Не удалось распарсить сообщение от %s: %s", client.ID, msg)
+		}
+	}
+}
+
+func (h *Hub) ListenPassengerMessages(client *Client) {
+	for {
+		_, msg, err := client.Conn.ReadMessage()
+		if err != nil {
+			log.Printf("Ошибка чтения от %s: %v", client.ID, err)
+			return
+		}
+
+		var resp rmq.PassiNFO
+		if err := json.Unmarshal(msg, &resp); err == nil {
+			h.PassengerResponses <- resp // отправляем в канал ответов
+			log.Printf("📩 Ответ от водителя %s: %+v", client.ID, resp)
+		} else {
+			log.Printf("⚠️ Не удалось распарсить сообщение от %s: %s", client.ID, msg)
+		}
+	}
+}
+
+func (h *Hub) UpdateLocationWS(client *Client) {
+	for {
+		_, msg, err := client.Conn.ReadMessage()
+		if err != nil {
+			log.Printf("Ошибка чтения от %s: %v", client.ID, err)
+			return
+		}
+
+		var resp rmq.LocationUpdateMessage
+		if err := json.Unmarshal(msg, &resp); err == nil {
+			h.UpdateLocation <- resp
 			log.Printf("📩 Ответ от водителя %s: %+v", client.ID, resp)
 		} else {
 			log.Printf("⚠️ Не удалось распарсить сообщение от %s: %s", client.ID, msg)

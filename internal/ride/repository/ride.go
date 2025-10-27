@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"ride-hail/internal/ride/model"
 	"ride-hail/pkg/uuid"
@@ -25,6 +26,45 @@ func (r *RideRepository) BeginTx(ctx context.Context) (pgx.Tx, error) {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	return tx, nil
+}
+
+func (r *RideRepository) GetPassengerIDByRideID(ctx context.Context, rideID string) (string, error) {
+	var passengerID string
+
+	query := `
+		SELECT passenger_id
+		FROM rides
+		WHERE id = $1
+	`
+
+	err := r.DB.QueryRow(ctx, query, rideID).Scan(&passengerID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", fmt.Errorf("ride with id %s not found", rideID)
+		}
+		return "", fmt.Errorf("failed to get passenger_id: %w", err)
+	}
+
+	return passengerID, nil
+}
+
+func (r *RideRepository) UpdateRideStatusMatched(ctx context.Context, rideID string, driverID string) error {
+	query := `
+		UPDATE rides
+		SET 
+			status = 'MATCHED',
+			driver_id = $1,
+			matched_at = $2,
+			updated_at = $2
+		WHERE id = $3;
+	`
+
+	_, err := r.DB.Exec(ctx, query, driverID, time.Now().UTC(), rideID)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (r *RideRepository) InsertRide(ctx context.Context, tx pgx.Tx, ride model.Ride) (*model.Ride, error) {
