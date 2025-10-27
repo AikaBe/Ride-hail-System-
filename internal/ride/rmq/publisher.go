@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	amqp "github.com/rabbitmq/amqp091-go"
 	"ride-hail/internal/common/rmq"
 	"time"
+
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 func (c *Client) PublishRideRequested(ctx context.Context, msg rmq.RideRequestedMessage) error {
@@ -20,6 +21,43 @@ func (c *Client) PublishRideRequested(ctx context.Context, msg rmq.RideRequested
 	}
 
 	routingKey := fmt.Sprintf("ride.request.%s", msg.RideType)
+
+	if err := c.Channel.ExchangeDeclare(
+		c.Exchange,
+		"topic",
+		true,  // durable
+		false, // auto-delete
+		false, // internal
+		false, // no-wait
+		nil,
+	); err != nil {
+		return fmt.Errorf("failed to declare exchange: %w", err)
+	}
+
+	if err := c.Channel.PublishWithContext(
+		ctx,
+		c.Exchange,
+		routingKey,
+		false,
+		false,
+		amqp.Publishing{
+			ContentType: "application/json",
+			Body:        body,
+		},
+	); err != nil {
+		return fmt.Errorf("failed to publish ride request: %w", err)
+	}
+
+	return nil
+}
+
+func (c *Client) PublishPassengerInfo(ctx context.Context, msg rmq.PassiNFO) error {
+	body, err := json.Marshal(msg)
+	if err != nil {
+		return fmt.Errorf("failed to marshal ride request message: %w", err)
+	}
+
+	routingKey := fmt.Sprintf("ride.request.%s", msg.Type)
 
 	if err := c.Channel.ExchangeDeclare(
 		c.Exchange,

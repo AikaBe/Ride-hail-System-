@@ -2,7 +2,6 @@ package ride_service
 
 import (
 	"context"
-	"github.com/jackc/pgx/v5"
 	"log"
 	"net/http"
 	"ride-hail/internal/common/config"
@@ -12,6 +11,8 @@ import (
 	"ride-hail/internal/ride/repository"
 	ridermq "ride-hail/internal/ride/rmq"
 	"ride-hail/internal/ride/service"
+
+	"github.com/jackc/pgx/v5"
 )
 
 func RunRide(cfg *config.Config, conn *pgx.Conn, commonMq *commonrmq.RabbitMQ, mux *http.ServeMux, hub *websocket.Hub) {
@@ -27,6 +28,7 @@ func RunRide(cfg *config.Config, conn *pgx.Conn, commonMq *commonrmq.RabbitMQ, m
 	handler := ridehttp.NewRideHandler(service)
 
 	go service.ListenForDriver(context.Background(), "driver_responses")
+	go service.LocationUpdate(context.Background(), "location_updates_ride")
 
 	mux.HandleFunc("POST /rides", handler.CreateRide)
 	mux.HandleFunc("POST /rides/{ride_id}/cancel", handler.CancelRide)

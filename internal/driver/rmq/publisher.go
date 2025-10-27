@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	amqp "github.com/rabbitmq/amqp091-go"
 	"ride-hail/internal/common/rmq"
+
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 func (c *Client) PublishDriverResponse(ctx context.Context, msg rmq.DriverResponseMessage) error {
@@ -89,7 +90,7 @@ func (c *Client) PublishLocationUpdate(ctx context.Context, msg rmq.LocationUpda
 	}
 
 	if err := c.Channel.ExchangeDeclare(
-		c.Exchange,
+		"location_fanout",
 		"fanout",
 		true,
 		false,

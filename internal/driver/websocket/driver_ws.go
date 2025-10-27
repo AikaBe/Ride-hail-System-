@@ -11,11 +11,6 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-type DriverWSMessage struct {
-	Type  string `json:"type"`
-	Token string `json:"token,omitempty"`
-}
-
 var Upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
@@ -26,7 +21,10 @@ func DriverWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hub, 
 		http.Error(w, "WebSocket upgrade failed", http.StatusInternalServerError)
 		return
 	}
-
+	defer func() {
+		conn.Close()
+	}()
+	done := make(chan struct{})
 	// Устанавливаем таймауты и обработчик pong
 	conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 	conn.SetPongHandler(func(appData string) error {
@@ -40,16 +38,16 @@ func DriverWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hub, 
 		Token string `json:"token"`
 	}
 	if err := conn.ReadJSON(&authMsg); err != nil {
-		log.Printf("Driver WS user read error: %v", err)
-		conn.Close()
+		log.Printf("Driver WS read auth error: %v", err)
+		conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "auth failed"))
 		return
 	}
 
 	// Проверяем токен
 	claims, err := jwtManager.ValidateToken(authMsg.Token)
 	if err != nil {
-		conn.WriteJSON(map[string]string{"error": "invalid token"})
-		conn.Close()
+		log.Printf("invalid token for passenger: %v", err)
+		conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "invalid token"))
 		return
 	}
 
@@ -60,8 +58,26 @@ func DriverWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hub, 
 		Send: make(chan []byte, 256),
 	}
 	hub.Register <- client
+	log.Printf("🚪 Driver connection closed: %s", client.ID)
 
-	// Отправка сообщений из hub.Send в WebSocket
+	// Периодически отправляем Ping
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				err := conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(10*time.Second))
+				if err != nil {
+					log.Printf("ping failed for driver %s: %v", claims.UserID, err)
+					return
+				}
+			}
+		}
+	}()
+
 	go func() {
 		for msg := range client.Send {
 			if err := client.Conn.WriteMessage(websocket.TextMessage, msg); err != nil {
@@ -70,42 +86,26 @@ func DriverWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hub, 
 			}
 		}
 	}()
-
-	// Чтение сообщений от водителя
-	go hub.ListenClientMessages(client)
-
-	log.Printf("🧍‍♀️ Driver connected: %s", claims)
-
-	// Периодически отправляем Ping
-	go func() {
-		ticker := time.NewTicker(30 * time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				if err := conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(10*time.Second)); err != nil {
-					log.Printf("ping failed for passenger %s: %v", claims, err)
-					conn.Close()
-					return
-				}
-			}
-		}
-	}()
-
-	// Читаем входящие сообщения (например, подтверждения или чаты)
 	for {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
-			log.Printf("Driver %s disconnected: %v", claims, err)
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				log.Printf("driver %s disconnected unexpectedly: %v", claims.UserID, err)
+			} else {
+				log.Printf("driver %s disconnected", claims.UserID)
+			}
 			break
 		}
 
-		log.Printf("📨 Message from driver %s: %s", claims, msg)
-		// можно просто сохранить сообщение в канал (если нужно)
+		log.Printf("📨 Message from driver %s: %s", claims.UserID, msg)
 		hub.Broadcast <- msg
 	}
 
+	go hub.ListenDriverMessages(client)
+	go hub.UpdateLocationWS(client)
+
+	<-done
 	hub.Unregister <- client
-	conn.Close()
-	log.Printf("🚪 Driver connection closed: %s", claims)
+	conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "bye"))
+	log.Printf("🚪 Passenger connection closed: %s", claims.UserID)
 }

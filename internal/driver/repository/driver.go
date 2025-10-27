@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"ride-hail/internal/driver/model"
 	ridemodel "ride-hail/internal/ride/model"
@@ -18,6 +20,74 @@ type DriverRepository struct {
 
 func NewDriverRepository(db *pgx.Conn) *DriverRepository {
 	return &DriverRepository{db: db}
+}
+
+func (r *DriverRepository) GetInfo(ctx context.Context, id string) (model.DriverInfo, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return model.DriverInfo{}, err
+	}
+	defer tx.Rollback(ctx)
+
+	var info model.DriverInfo
+	var vehicleAttrs []byte
+
+	err = tx.QueryRow(ctx, `
+		SELECT u.name, d.rating, d.vehicle_attrs
+		FROM drivers d
+		JOIN users u ON u.id = d.id
+		WHERE d.id = $1
+	`, id).Scan(&info.Name, &info.Rating, &vehicleAttrs)
+
+	if err != nil {
+		return model.DriverInfo{}, err
+	}
+
+	// Парсим JSONB с атрибутами автомобиля
+	if err := json.Unmarshal(vehicleAttrs, &info.Vehicle); err != nil {
+		return model.DriverInfo{}, err
+	}
+
+	// Коммит транзакции
+	if err := tx.Commit(ctx); err != nil {
+		return model.DriverInfo{}, err
+	}
+
+	return info, nil
+}
+func (r *DriverRepository) GetDriverIDByRideID(ctx context.Context, rideID string) (string, error) {
+	var DriverID string
+
+	query := `
+		SELECT driver_id
+		FROM rides
+		WHERE id = $1
+	`
+
+	err := r.db.QueryRow(ctx, query, rideID).Scan(&DriverID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", fmt.Errorf("ride with id %s not found", rideID)
+		}
+		return "", fmt.Errorf("failed to get passenger_id: %w", err)
+	}
+
+	return DriverID, nil
+}
+
+func (r *DriverRepository) GetPickupLocation(ctx context.Context, rideID string) (float64, float64, error) {
+	var lat, lng float64
+	query := `
+		SELECT c.latitude, c.longitude
+		FROM rides r
+		JOIN coordinates c ON r.pickup_coordinate_id = c.id
+		WHERE r.id = $1
+	`
+	err := r.db.QueryRow(ctx, query, rideID).Scan(&lat, &lng)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to get pickup location: %w", err)
+	}
+	return lat, lng, nil
 }
 
 func (r *DriverRepository) FindNearbyDrivers(ctx context.Context, pickup model.Location, vehicleType usermodel.VehicleType, radiusMeters float64) ([]model.DriverNearby, error) {
