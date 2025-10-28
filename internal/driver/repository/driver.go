@@ -56,7 +56,7 @@ func (r *DriverRepository) GetInfo(ctx context.Context, id string) (model.Driver
 	return info, nil
 }
 func (r *DriverRepository) GetDriverIDByRideID(ctx context.Context, rideID string) (string, error) {
-	var DriverID string
+	var driverID *string // Use pointer to handle NULL
 
 	query := `
 		SELECT driver_id
@@ -64,15 +64,19 @@ func (r *DriverRepository) GetDriverIDByRideID(ctx context.Context, rideID strin
 		WHERE id = $1
 	`
 
-	err := r.db.QueryRow(ctx, query, rideID).Scan(&DriverID)
+	err := r.db.QueryRow(ctx, query, rideID).Scan(&driverID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return "", fmt.Errorf("ride with id %s not found", rideID)
 		}
-		return "", fmt.Errorf("failed to get passenger_id: %w", err)
+		return "", fmt.Errorf("failed to get driver_id: %w", err)
 	}
 
-	return DriverID, nil
+	if driverID == nil {
+		return "", fmt.Errorf("driver not assigned to ride %s", rideID)
+	}
+
+	return *driverID, nil
 }
 
 func (r *DriverRepository) GetPickupLocation(ctx context.Context, rideID string) (float64, float64, error) {
@@ -140,9 +144,9 @@ func (r *DriverRepository) SetOnline(ctx context.Context, driverID uuid.UUID, la
 
 	var session model.DriverSession
 	err = tx.QueryRow(ctx, `
-		INSERT INTO driver_sessions (driver_id,started_at)
-		VALUES ($1,now())
-		RETURNING id
+		INSERT INTO driver_sessions (driver_id, started_at)
+		VALUES ($1, now())
+		RETURNING id, driver_id, started_at
 	`, driverID).Scan(&session.ID, &session.DriverID, &session.StartedAt)
 	if err != nil {
 		return model.DriverSession{}, err
@@ -158,9 +162,39 @@ func (r *DriverRepository) SetOnline(ctx context.Context, driverID uuid.UUID, la
 	}
 
 	_, err = tx.Exec(ctx, `
-		INSERT INTO location_history ( driver_id, latitude, longitude)
-		VALUES ( $1, $2, $3)
+		INSERT INTO location_history (driver_id, latitude, longitude, recorded_at)
+		VALUES ($1, $2, $3, now())
 	`, driverID, lat, lon)
+	if err != nil {
+		return model.DriverSession{}, err
+	}
+
+	// Check if coordinate already exists for this driver
+	var existingCoordID string
+	err = tx.QueryRow(ctx, `
+		SELECT id FROM coordinates 
+		WHERE entity_id = $1 AND entity_type = 'driver' AND is_current = true
+	`, driverID).Scan(&existingCoordID)
+
+	if err != nil && err != pgx.ErrNoRows {
+		return model.DriverSession{}, err
+	}
+
+	if err == pgx.ErrNoRows {
+		// No existing coordinate, insert new one
+		_, err = tx.Exec(ctx, `
+			INSERT INTO coordinates (entity_id, entity_type, address, latitude, longitude, is_current)
+			VALUES ($1, 'driver', 'Current location', $2, $3, true)
+		`, driverID, lat, lon)
+	} else {
+		// Update existing coordinate
+		_, err = tx.Exec(ctx, `
+			UPDATE coordinates 
+			SET latitude = $1, longitude = $2, updated_at = now()
+			WHERE id = $3
+		`, lat, lon, existingCoordID)
+	}
+
 	if err != nil {
 		return model.DriverSession{}, err
 	}
@@ -180,8 +214,25 @@ func (r *DriverRepository) SetOffline(ctx context.Context, driverID uuid.UUID) (
 	defer tx.Rollback(ctx)
 
 	var session model.DriverSession
+	// FIX: Check if session exists first
+	var sessionExists bool
 	err = tx.QueryRow(ctx, `
-		SELECT id, started_at, total_rides, total_earnings
+		SELECT EXISTS(
+			SELECT 1 FROM driver_sessions 
+			WHERE driver_id = $1 AND ended_at IS NULL
+		)
+	`, driverID).Scan(&sessionExists)
+	if err != nil {
+		return model.DriverSession{}, err
+	}
+
+	if !sessionExists {
+		return model.DriverSession{}, fmt.Errorf("no active session found for driver")
+	}
+
+	// FIX: Scan correct number of columns
+	err = tx.QueryRow(ctx, `
+		SELECT id, driver_id, started_at, total_rides, total_earnings
 		FROM driver_sessions
 		WHERE driver_id = $1 AND ended_at IS NULL
 		ORDER BY started_at DESC

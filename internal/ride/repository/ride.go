@@ -185,12 +185,19 @@ func (r *RideRepository) CancelRide(ctx context.Context, rideID, reason string) 
 		return nil, fmt.Errorf("failed to cancel ride: %w", err)
 	}
 
+	// Fix: Use proper JSON construction for event_data
+	eventData := map[string]string{"reason": reason}
+	jsonData, err := json.Marshal(eventData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal event data: %w", err)
+	}
+
 	// Insert cancellation event
 	eventQuery := `
 		INSERT INTO ride_events (ride_id, event_type, event_data, created_at)
-		VALUES ($1, 'CANCELLED', json_build_object('reason', $2), NOW())
+		VALUES ($1, 'RIDE_CANCELLED', $2, NOW())
 	`
-	_, err = tx.Exec(ctx, eventQuery, rideID, reason)
+	_, err = tx.Exec(ctx, eventQuery, rideID, jsonData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to insert cancellation event: %w", err)
 	}

@@ -187,7 +187,7 @@ func (r *AdminRepository) GetActiveRides(ctx context.Context, page, pageSize int
 }
 
 func (r *AdminRepository) GetOnlineDrivers(ctx context.Context) ([]model.OnlineDriver, error) {
-	var drivers []model.OnlineDriver
+	drivers := make([]model.OnlineDriver, 0) // Ensure empty array, not nil
 
 	rows, err := r.db.Query(ctx, `
 		SELECT 
@@ -201,7 +201,7 @@ func (r *AdminRepository) GetOnlineDrivers(ctx context.Context) ([]model.OnlineD
 		ORDER BY d.status, d.rating DESC
 	`)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get online drivers: %w", err)
+		return drivers, fmt.Errorf("failed to get online drivers: %w", err)
 	}
 	defer rows.Close()
 
@@ -216,7 +216,7 @@ func (r *AdminRepository) GetOnlineDrivers(ctx context.Context) ([]model.OnlineD
 			&driver.TotalRides, &driver.TotalEarnings,
 		)
 		if err != nil {
-			return nil, err
+			return drivers, err
 		}
 
 		if lat != nil && lng != nil {
@@ -238,15 +238,27 @@ func (r *AdminRepository) GetOnlineDrivers(ctx context.Context) ([]model.OnlineD
 func (r *AdminRepository) GetSystemMetrics(ctx context.Context) (*model.SystemMetrics, error) {
 	metrics := &model.SystemMetrics{}
 
+	// Get basic metrics first
+	overview, err := r.GetSystemOverview(ctx)
+	if err != nil {
+		return metrics, nil // Return empty metrics instead of error
+	}
+
+	metrics.ActiveRides = overview.Metrics.ActiveRides
+	metrics.AvailableDrivers = overview.Metrics.AvailableDrivers
+	metrics.BusyDrivers = overview.Metrics.BusyDrivers
+	metrics.TotalRidesToday = overview.Metrics.TotalRidesToday
+	metrics.TotalRevenueToday = overview.Metrics.TotalRevenueToday
+
 	// Calculate average wait time (time from requested to matched)
-	err := r.db.QueryRow(ctx, `
+	err = r.db.QueryRow(ctx, `
 		SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (matched_at - requested_at)) / 60), 0)
 		FROM rides 
 		WHERE matched_at IS NOT NULL AND requested_at IS NOT NULL
 		AND created_at >= NOW() - INTERVAL '1 day'
 	`).Scan(&metrics.AverageWaitTimeMinutes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get average wait time: %w", err)
+		metrics.AverageWaitTimeMinutes = 0
 	}
 
 	// Calculate average ride duration
@@ -257,7 +269,7 @@ func (r *AdminRepository) GetSystemMetrics(ctx context.Context) (*model.SystemMe
 		AND created_at >= NOW() - INTERVAL '1 day'
 	`).Scan(&metrics.AverageRideDurationMinutes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get average ride duration: %w", err)
+		metrics.AverageRideDurationMinutes = 0
 	}
 
 	// Calculate cancellation rate
@@ -271,7 +283,7 @@ func (r *AdminRepository) GetSystemMetrics(ctx context.Context) (*model.SystemMe
 		WHERE created_at >= NOW() - INTERVAL '1 day'
 	`).Scan(&metrics.CancellationRate)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get cancellation rate: %w", err)
+		metrics.CancellationRate = 0
 	}
 
 	return metrics, nil

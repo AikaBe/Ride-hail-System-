@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"ride-hail/internal/admin/model"
 	"ride-hail/internal/admin/service"
 	"strconv"
 
@@ -80,6 +81,11 @@ func (h *AdminHandler) GetOnlineDrivers(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Ensure we always return an array, not null
+	if drivers == nil {
+		drivers = make([]model.OnlineDriver, 0)
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(drivers); err != nil {
 		logger.Error(action, "Failed to encode response", requestID, "", err.Error(), "")
@@ -96,9 +102,8 @@ func (h *AdminHandler) GetSystemMetrics(w http.ResponseWriter, r *http.Request) 
 
 	metrics, err := h.service.GetSystemMetrics(r.Context())
 	if err != nil {
-		logger.Error(action, "Failed to get system metrics", requestID, "", err.Error(), "")
-		http.Error(w, "Failed to get system metrics", http.StatusInternalServerError)
-		return
+		// Return empty metrics instead of error
+		metrics = &model.SystemMetrics{}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

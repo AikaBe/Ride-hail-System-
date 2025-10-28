@@ -362,3 +362,7 @@ func (s *DriverService) GetDriverInfo(ctx context.Context, driverID string) (mod
 	}
 	return responce, nil
 }
+
+func (s *DriverService) GetDriverIDByRideID(ctx context.Context, rideID string) (string, error) {
+	return s.repo.GetDriverIDByRideID(ctx, rideID)
+}

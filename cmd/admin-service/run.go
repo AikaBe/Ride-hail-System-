@@ -7,11 +7,13 @@ import (
 	"ride-hail/internal/admin/repository"
 	"ride-hail/internal/admin/service"
 	"ride-hail/internal/common/config"
+	"ride-hail/internal/common/logger"
 
 	"github.com/jackc/pgx/v5"
 )
 
 func RunAdmin(cfg *config.Config, conn *pgx.Conn, mux *http.ServeMux) {
+	logger.SetServiceName("admin-service")
 	log.Println("Starting Admin Service...")
 
 	repo := repository.NewAdminRepository(conn)

@@ -2,10 +2,10 @@ package ride_service
 
 import (
 	"context"
-	"github.com/jackc/pgx/v5"
 	"log"
 	"net/http"
 	"ride-hail/internal/common/config"
+	"ride-hail/internal/common/logger"
 	commonrmq "ride-hail/internal/common/rmq"
 	"ride-hail/internal/common/websocket"
 	ridehttp "ride-hail/internal/ride/handler"
@@ -14,9 +14,12 @@ import (
 	"ride-hail/internal/ride/service"
 	ridews "ride-hail/internal/ride/websocket"
 	"ride-hail/internal/user/jwt"
+
+	"github.com/jackc/pgx/v5"
 )
 
 func RunRide(cfg *config.Config, conn *pgx.Conn, commonMq *commonrmq.RabbitMQ, mux *http.ServeMux, hub *websocket.Hub, wsMux *http.ServeMux, jwtManager *jwt.Manager) {
+	logger.SetServiceName("ride-service")
 	log.Printf("Ride Service running on port %d\n", cfg.Services.RideServicePort)
 
 	rmqClient, err := ridermq.NewClient(commonMq.URL, "ride_topic")

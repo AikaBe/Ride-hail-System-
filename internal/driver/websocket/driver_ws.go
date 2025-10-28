@@ -20,19 +20,10 @@ var Upgrader = websocket.Upgrader{
 func DriverWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hub, jwtManager *jwt.Manager, svc *service.DriverService) {
 	conn, err := Upgrader.Upgrade(w, r, nil)
 	if err != nil {
+		log.Printf("❌ WebSocket upgrade failed: %v", err)
 		http.Error(w, "WebSocket upgrade failed", http.StatusInternalServerError)
 		return
 	}
-	defer func() {
-		conn.Close()
-	}()
-	done := make(chan struct{})
-	// Устанавливаем таймауты и обработчик pong
-	conn.SetReadDeadline(time.Now().Add(60 * time.Second))
-	conn.SetPongHandler(func(appData string) error {
-		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
-		return nil
-	})
 
 	// Читаем сообщение авторизации
 	var authMsg struct {
@@ -40,16 +31,26 @@ func DriverWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hub, 
 		Token string `json:"token"`
 	}
 	if err := conn.ReadJSON(&authMsg); err != nil {
-		log.Printf("Driver WS read auth error: %v", err)
+		log.Printf("❌ Driver WS read auth error: %v", err)
 		conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "auth failed"))
+		conn.Close()
 		return
 	}
 
 	// Проверяем токен
 	claims, err := jwtManager.ValidateToken(authMsg.Token)
 	if err != nil {
-		log.Printf("invalid token for passenger: %v", err)
+		log.Printf("❌ Invalid token for driver: %v", err)
 		conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "invalid token"))
+		conn.Close()
+		return
+	}
+
+	// Проверяем, что пользователь действительно водитель
+	if claims.Role != "DRIVER" {
+		log.Printf("❌ User is not a driver: %s", claims.UserID)
+		conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "user is not a driver"))
+		conn.Close()
 		return
 	}
 
@@ -60,55 +61,61 @@ func DriverWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hub, 
 		Send: make(chan []byte, 256),
 	}
 	hub.Register <- client
-	log.Printf("🚪 Driver connection closed: %s", client.ID)
 
-	// Периодически отправляем Ping
+	log.Printf("🚗 Driver connected: %s", client.ID)
+
+	// Устанавливаем таймауты
+	conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+	conn.SetPongHandler(func(appData string) error {
+		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		return nil
+	})
+
+	// Горутина для отправки сообщений водителю
 	go func() {
-		ticker := time.NewTicker(30 * time.Second)
-		defer ticker.Stop()
+		defer func() {
+			hub.Unregister <- client
+			conn.Close()
+			log.Printf("🚪 Driver connection closed: %s", client.ID)
+		}()
+
 		for {
 			select {
-			case <-done:
-				return
-			case <-ticker.C:
-				err := conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(10*time.Second))
-				if err != nil {
-					log.Printf("ping failed for driver %s: %v", claims.UserID, err)
+			case message, ok := <-client.Send:
+				if !ok {
+					return
+				}
+				if err := conn.WriteMessage(websocket.TextMessage, message); err != nil {
+					log.Printf("❌ Error sending to driver %s: %v", client.ID, err)
 					return
 				}
 			}
 		}
 	}()
 
+	// Горутина для ping-pong
 	go func() {
-		for msg := range client.Send {
-			if err := client.Conn.WriteMessage(websocket.TextMessage, msg); err != nil {
-				log.Printf("Ошибка отправки драйверу %s: %v", client.ID, err)
-				break
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				if err := conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(10*time.Second)); err != nil {
+					log.Printf("❌ Ping failed for driver %s: %v", client.ID, err)
+					return
+				}
 			}
 		}
 	}()
-	//for {
-	//	_, msg, err := conn.ReadMessage()
-	//	if err != nil {
-	//		if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-	//			log.Printf("driver %s disconnected unexpectedly: %v", claims.UserID, err)
-	//		} else {
-	//			log.Printf("driver %s disconnected", claims.UserID)
-	//		}
-	//		break
-	//	}
-	//
-	//	log.Printf("📨 Message from driver %s: %s", claims.UserID, msg)
-	//	hub.Broadcast <- msg
-	//}
 
+	// Запускаем обработку сообщений от водителя
 	go hub.ListenDriverMessages(client)
+
+	// Запускаем обработку ответов для MQ
 	go svc.SendToMq(context.Background())
 	go svc.UpdateLocationWS(context.Background())
 
-	<-done
-	hub.Unregister <- client
-	conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "bye"))
-	log.Printf("🚪 Passenger connection closed: %s", claims.UserID)
+	// Ждем закрытия соединения
+	<-make(chan struct{})
 }
