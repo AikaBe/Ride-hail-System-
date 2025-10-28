@@ -1,0 +1,88 @@
+ride-hail/
+├── cmd/
+│   ├── driver-location-service/
+│   │   └── run.go
+│   ├── ride-service/
+│   │   └── run.go
+│   └── user-service/
+│       └── run.go
+├── configs/config.yaml
+├── internal/
+│   ├── admin/
+│   ├── common/
+│   │   ├── config/
+│   │   │   └── config.go
+│   │   ├── db/
+│   │   │   ├── connect.go
+│   │   │   └── migrate.go
+│   │   ├── logger/
+│   │   │   └── logger.go
+│   │   ├── rmq/
+│   │   │   ├── connect.go
+│   │   │   └── dto.go
+│   │   └── websocket/
+│   │       └── hub.go
+│   ├── driver/
+│   │   ├── handler/
+│   │   │   ├── dto/
+│   │   │   │   └── dto.go
+│   │   │   └── handler.go
+│   │   ├── model/
+│   │   │   └── driver_entities.go
+│   │   ├── repository/
+│   │   │   └── driver.go
+│   │   ├── rmq/
+│   │   │   ├── client.go
+│   │   │   ├── consumer.go
+│   │   │   └── publisher.go
+│   │   ├── service/
+│   │   │   └── driver_status.go
+│   │   └── websocket/
+│   │       └── driver_ws.go
+│   ├── ride/
+│   │   ├── handler/
+│   │   │   ├── dto/
+│   │   │   │   ├── dto.go
+│   │   │   │   └── mapper.go
+│   │   │   └── handler.go
+│   │   ├── model/
+│   │   │   ├── ride_entities.go
+│   │   │   └── ride_enums.go
+│   │   ├── repository/
+│   │   │   └── ride.go
+│   │   ├── rmq/
+│   │   │   ├── client.go
+│   │   │   ├── consumer.go
+│   │   │   └── publisher.go
+│   │   ├── service/
+│   │   │   ├── ride.go
+│   │   │   └── validator.go
+│   │   └── websocket/
+│   │       └── passenger_ws.go
+│   └── user/
+│       ├── handler/
+│       │   ├── dto/
+│       │   │   └── dto.go
+│       │   └── handler.go
+│       ├── jwt/
+│       │   └── manager.go
+│       ├── model/
+│       │   ├── driver.go
+│       │   └── user.go
+│       ├── repository/
+│       │   └── auth.go
+│       └── service/
+│           └── auth.go
+├── migrations/
+│   ├── 001_ride_service.down.sql
+│   ├──001_ride_service.up.sql
+│   ├──002_driver_location.down.sql
+│   └──002_driver_location.up.sql
+├── pkg/
+│   └──uuid/
+│       └──uuid.go
+├── gitignore
+├── docker-compose.yml
+├── go.mod
+├── main.go
+└── Readme.md

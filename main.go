@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	cmdAdmin "ride-hail/cmd/admin-service"
 	cmdDriver "ride-hail/cmd/driver-location-service"
 	cmdRide "ride-hail/cmd/ride-service"
 	cmdUser "ride-hail/cmd/user-service"
@@ -57,6 +58,7 @@ func main() {
 	go cmdUser.RunUser(pg.Conn, mux, jwtManager)
 	go cmdRide.RunRide(cfg, pg.Conn, commonRMQ, mux, hub, wsMux, jwtManager)
 	go cmdDriver.RunDriver(cfg, pg.Conn, commonRMQ, mux, hub, wsMux, jwtManager)
+	go cmdAdmin.RunAdmin(cfg, pg.Conn, mux)
 
 	go func() {
 		log.Println("WebSocket server running on ws://localhost:3000")
