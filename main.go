@@ -13,8 +13,6 @@ import (
 	"ride-hail/internal/common/db"
 	"ride-hail/internal/common/rmq"
 	"ride-hail/internal/common/websocket"
-	driverws "ride-hail/internal/driver/websocket"
-	ridews "ride-hail/internal/ride/websocket"
 	"ride-hail/internal/user/jwt"
 	"syscall"
 	"time"
@@ -54,19 +52,11 @@ func main() {
 	go hub.Run()
 
 	mux := http.NewServeMux()
-
-	cmdUser.RunUser(pg.Conn, mux, jwtManager)
-	cmdRide.RunRide(cfg, pg.Conn, commonRMQ, mux, hub)
-	cmdDriver.RunDriver(cfg, pg.Conn, commonRMQ, mux, hub)
-
 	wsMux := http.NewServeMux()
 
-	wsMux.HandleFunc("/ws/passengers/", func(w http.ResponseWriter, r *http.Request) {
-		ridews.PassengerWSHandler(w, r, hub, jwtManager)
-	})
-	wsMux.HandleFunc("/ws/drivers/", func(w http.ResponseWriter, r *http.Request) {
-		driverws.DriverWSHandler(w, r, hub, jwtManager)
-	})
+	go cmdUser.RunUser(pg.Conn, mux, jwtManager)
+	go cmdRide.RunRide(cfg, pg.Conn, commonRMQ, mux, hub, wsMux, jwtManager)
+	go cmdDriver.RunDriver(cfg, pg.Conn, commonRMQ, mux, hub, wsMux, jwtManager)
 
 	go func() {
 		log.Println("WebSocket server running on ws://localhost:3000")

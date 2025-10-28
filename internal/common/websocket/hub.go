@@ -110,14 +110,32 @@ func (h *Hub) ListenDriverMessages(client *Client) {
 			return
 		}
 
-		var resp DriverModel.DriverResponceWS
-		if err := json.Unmarshal(msg, &resp); err == nil {
-			resp.DriverID = client.ID // на всякий случай
-			h.DriverResponses <- resp // отправляем в канал ответов
-			log.Printf("📩 Ответ от водителя %s: %+v", client.ID, resp)
-		} else {
-			log.Printf("⚠️ Не удалось распарсить сообщение от %s: %s", client.ID, msg)
+		// 1) Попробуем распарсить как LocationUpdateMessage
+		var loc rmq.LocationUpdateMessage
+		if err := json.Unmarshal(msg, &loc); err == nil && loc.DriverID != "" && loc.RideID != "" {
+			// Нормализуем driver id (убираем префикс "driver_" если есть)
+			if strings.HasPrefix(loc.DriverID, "driver_") {
+				loc.DriverID = strings.TrimPrefix(loc.DriverID, "driver_")
+			}
+			h.UpdateLocation <- loc
+			log.Printf("📍 Location update from %s -> ride %s: %+v", client.ID, loc.RideID, loc)
+			continue
 		}
+
+		// 2) Попробуем распарсить как DriverResponceWS
+		var resp DriverModel.DriverResponceWS
+		if err := json.Unmarshal(msg, &resp); err == nil && (resp.RideID != "" || resp.Type != "") {
+			// Заполняем DriverID (на случай, если в сообщении его нет)
+			resp.DriverID = client.ID
+			// также можно нормализовать DriverID (убрать префикс)
+			if strings.HasPrefix(resp.DriverID, "driver_") {
+				resp.DriverID = strings.TrimPrefix(resp.DriverID, "driver_")
+			}
+			h.DriverResponses <- resp
+			log.Printf("📩 Driver response from %s: %+v", client.ID, resp)
+			continue
+		}
+		log.Printf("⚠️ Неопознанное сообщение от %s: %s", client.ID, string(msg))
 	}
 }
 
@@ -139,20 +157,21 @@ func (h *Hub) ListenPassengerMessages(client *Client) {
 	}
 }
 
-func (h *Hub) UpdateLocationWS(client *Client) {
-	for {
-		_, msg, err := client.Conn.ReadMessage()
-		if err != nil {
-			log.Printf("Ошибка чтения от %s: %v", client.ID, err)
-			return
-		}
-
-		var resp rmq.LocationUpdateMessage
-		if err := json.Unmarshal(msg, &resp); err == nil {
-			h.UpdateLocation <- resp
-			log.Printf("📩 Ответ от водителя %s: %+v", client.ID, resp)
-		} else {
-			log.Printf("⚠️ Не удалось распарсить сообщение от %s: %s", client.ID, msg)
-		}
-	}
-}
+//
+//func (h *Hub) UpdateLocationWS(client *Client) {
+//	for {
+//		_, msg, err := client.Conn.ReadMessage()
+//		if err != nil {
+//			log.Printf("Ошибка чтения от %s: %v", client.ID, err)
+//			return
+//		}
+//
+//		var resp rmq.LocationUpdateMessage
+//		if err := json.Unmarshal(msg, &resp); err == nil {
+//			h.UpdateLocation <- resp
+//			log.Printf("📩 Ответ от водителя %s: %+v", client.ID, resp)
+//		} else {
+//			log.Printf("⚠️ Не удалось распарсить сообщение от %s: %s", client.ID, msg)
+//		}
+//	}
+//}

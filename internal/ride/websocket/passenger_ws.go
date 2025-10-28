@@ -1,9 +1,11 @@
 package websocket
 
 import (
+	"context"
 	"log"
 	"net/http"
 	commonws "ride-hail/internal/common/websocket"
+	"ride-hail/internal/ride/service"
 	"ride-hail/internal/user/jwt"
 	"time"
 
@@ -14,7 +16,7 @@ var Upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
-func PassengerWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hub, jwtManager *jwt.Manager) {
+func PassengerWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hub, jwtManager *jwt.Manager, svc *service.RideService) {
 	conn, err := Upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		http.Error(w, "WebSocket upgrade failed", http.StatusInternalServerError)
@@ -86,8 +88,9 @@ func PassengerWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hu
 			}
 		}
 	}()
-	//go hub.ListenPassengerMessages(client)
-	// Читаем входящие сообщения (например, подтверждения или чаты)
+	go hub.ListenPassengerMessages(client)
+	go svc.SendPassInfo(context.Background())
+	//Читаем входящие сообщения (например, подтверждения или чаты)
 	for {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {

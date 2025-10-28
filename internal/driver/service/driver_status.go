@@ -15,6 +15,7 @@ import (
 	model2 "ride-hail/internal/ride/model"
 	usermodel "ride-hail/internal/user/model"
 	"ride-hail/pkg/uuid"
+	"strings"
 	"time"
 )
 
@@ -88,6 +89,9 @@ func (s *DriverService) SendToMq(ctx context.Context) {
 
 		case resp := <-s.wsHub.DriverResponses:
 			log.Printf(" Received driver response from WS: %+v", resp)
+			if strings.HasPrefix(resp.DriverID, "driver_") {
+				resp.DriverID = strings.TrimPrefix(resp.DriverID, "driver_")
+			}
 			driverInfo, err := s.repo.GetInfo(ctx, resp.DriverID)
 			if err != nil {
 

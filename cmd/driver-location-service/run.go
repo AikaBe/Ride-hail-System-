@@ -11,11 +11,13 @@ import (
 	"ride-hail/internal/driver/repository"
 	driverrmq "ride-hail/internal/driver/rmq"
 	"ride-hail/internal/driver/service"
+	driverws "ride-hail/internal/driver/websocket"
+	"ride-hail/internal/user/jwt"
 
 	"github.com/jackc/pgx/v5"
 )
 
-func RunDriver(cfg *config.Config, conn *pgx.Conn, commonMq *commonrmq.RabbitMQ, mux *http.ServeMux, hub *websocket.Hub) {
+func RunDriver(cfg *config.Config, conn *pgx.Conn, commonMq *commonrmq.RabbitMQ, mux *http.ServeMux, hub *websocket.Hub, wsMux *http.ServeMux, jwtManager *jwt.Manager) {
 	log.Println("Starting Driver & Location Service...")
 
 	rmqClient, err := driverrmq.NewClient(commonMq.URL, "driver_topic")
@@ -34,8 +36,9 @@ func RunDriver(cfg *config.Config, conn *pgx.Conn, commonMq *commonrmq.RabbitMQ,
 	mux.HandleFunc("POST /drivers/{driver_id}/start", h.Start)
 	mux.HandleFunc("POST /drivers/{driver_id}/complete", h.Complete)
 
+	wsMux.HandleFunc("/ws/drivers/", func(w http.ResponseWriter, r *http.Request) {
+		driverws.DriverWSHandler(w, r, hub, jwtManager, svc)
+	})
 	go svc.ListenForRides(context.Background(), "ride_requests")
-	go svc.SendToMq(context.Background())
 	go svc.ListenForPassengers(context.Background(), "driver_matching")
-	//	go svc.UpdateLocationWS(context.Background())
 }

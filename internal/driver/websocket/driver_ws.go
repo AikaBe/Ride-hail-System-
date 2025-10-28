@@ -1,8 +1,10 @@
 package websocket
 
 import (
+	"context"
 	"log"
 	"net/http"
+	"ride-hail/internal/driver/service"
 	"ride-hail/internal/user/jwt"
 	"time"
 
@@ -15,7 +17,7 @@ var Upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
-func DriverWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hub, jwtManager *jwt.Manager) {
+func DriverWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hub, jwtManager *jwt.Manager, svc *service.DriverService) {
 	conn, err := Upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		http.Error(w, "WebSocket upgrade failed", http.StatusInternalServerError)
@@ -86,23 +88,24 @@ func DriverWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hub, 
 			}
 		}
 	}()
-	for {
-		_, msg, err := conn.ReadMessage()
-		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("driver %s disconnected unexpectedly: %v", claims.UserID, err)
-			} else {
-				log.Printf("driver %s disconnected", claims.UserID)
-			}
-			break
-		}
-
-		log.Printf("📨 Message from driver %s: %s", claims.UserID, msg)
-		hub.Broadcast <- msg
-	}
+	//for {
+	//	_, msg, err := conn.ReadMessage()
+	//	if err != nil {
+	//		if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+	//			log.Printf("driver %s disconnected unexpectedly: %v", claims.UserID, err)
+	//		} else {
+	//			log.Printf("driver %s disconnected", claims.UserID)
+	//		}
+	//		break
+	//	}
+	//
+	//	log.Printf("📨 Message from driver %s: %s", claims.UserID, msg)
+	//	hub.Broadcast <- msg
+	//}
 
 	go hub.ListenDriverMessages(client)
-	go hub.UpdateLocationWS(client)
+	go svc.SendToMq(context.Background())
+	go svc.UpdateLocationWS(context.Background())
 
 	<-done
 	hub.Unregister <- client

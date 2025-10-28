@@ -60,10 +60,10 @@ func (s *RideService) ListenForDriver(ctx context.Context, queueName string) {
 			if err != nil {
 				log.Println(err)
 			}
-			go s.SendPassInfo(ctx)
-			if err != nil {
-				log.Println(err)
-			}
+			//go s.SendPassInfo(ctx)
+			//if err != nil {
+			//	log.Println(err)
+			//}
 		} else {
 			// 🟥 Если водитель отклонил
 			log.Printf("🚫 Водитель %s отклонил поездку %s", msg.DriverID, msg.RideID)

@@ -54,18 +54,7 @@ websocket login
 "ride_type": "ECONOMY"
 }
 
-driver answer to ride
 
-{
-"type": "ride_response",
-"offer_id": "offer_123456",
-"ride_id": "550e8400-e29b-41d4-a716-446655440000",
-"accepted": true,
-"current_location": {
-"latitude": 43.235,
-"longitude": 76.885
-}
-}
 
 After matching passenger send info
 {
@@ -81,6 +70,20 @@ After matching passenger send info
 }
 }
 
+
+driver answer to ride
+
+{
+"type": "ride_response",
+"offer_id": "offer_123456",
+"driver_id": "",
+"ride_id": "550e8400-e29b-41d4-a716-446655440000",
+"accepted": true,
+"current_location": {
+"latitude": 43.235,
+"longitude": 76.885
+}
+}
 update location 
 
 {
