@@ -87,7 +87,7 @@ func Warn(action, message, requestID, rideID, errMsg string) {
 }
 
 // ERROR лог
-func Error(action, message, requestID, rideID, errMsg, errStack string) {
+func Error(action, message, requestID, rideID, errStack string) {
 	entry := LogEntry{
 		Timestamp: time.Now().Format(time.RFC3339),
 		Level:     "ERROR",
@@ -101,7 +101,6 @@ func Error(action, message, requestID, rideID, errMsg, errStack string) {
 			Msg   string `json:"msg"`
 			Stack string `json:"stack"`
 		}{
-			Msg:   errMsg,
 			Stack: errStack,
 		},
 	}

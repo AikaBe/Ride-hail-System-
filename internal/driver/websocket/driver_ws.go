@@ -1,8 +1,10 @@
 package websocket
 
 import (
-	"log"
+	"context"
 	"net/http"
+	"ride-hail/internal/common/logger"
+	"ride-hail/internal/driver/service"
 	"ride-hail/internal/user/jwt"
 	"time"
 
@@ -15,52 +17,51 @@ var Upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
-func DriverWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hub, jwtManager *jwt.Manager) {
+func DriverWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hub, jwtManager *jwt.Manager, svc *service.DriverService) {
 	conn, err := Upgrader.Upgrade(w, r, nil)
 	if err != nil {
+		logger.Error("driver_ws_upgrade", "WebSocket upgrade failed", "", "", err.Error())
 		http.Error(w, "WebSocket upgrade failed", http.StatusInternalServerError)
 		return
 	}
 	defer func() {
 		conn.Close()
 	}()
+
 	done := make(chan struct{})
-	// Устанавливаем таймауты и обработчик pong
+
 	conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 	conn.SetPongHandler(func(appData string) error {
 		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 		return nil
 	})
 
-	// Читаем сообщение авторизации
 	var authMsg struct {
 		Type  string `json:"type"`
 		Token string `json:"token"`
 	}
+
 	if err := conn.ReadJSON(&authMsg); err != nil {
-		log.Printf("Driver WS read auth error: %v", err)
+		logger.Error("driver_ws_auth", "failed to read auth message", "", "", err.Error())
 		conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "auth failed"))
 		return
 	}
 
-	// Проверяем токен
 	claims, err := jwtManager.ValidateToken(authMsg.Token)
 	if err != nil {
-		log.Printf("invalid token for passenger: %v", err)
+		logger.Warn("driver_ws_token", "invalid token for driver", "", "", err.Error())
 		conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "invalid token"))
 		return
 	}
 
-	// Создаем клиента и регистрируем в Hub
 	client := &commonws.Client{
 		ID:   "driver_" + claims.UserID,
 		Conn: conn,
 		Send: make(chan []byte, 256),
 	}
 	hub.Register <- client
-	log.Printf("🚪 Driver connection closed: %s", client.ID)
+	logger.Info("driver_ws_connect", "driver connected", claims.UserID, "")
 
-	// Периодически отправляем Ping
 	go func() {
 		ticker := time.NewTicker(30 * time.Second)
 		defer ticker.Stop()
@@ -71,7 +72,7 @@ func DriverWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hub, 
 			case <-ticker.C:
 				err := conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(10*time.Second))
 				if err != nil {
-					log.Printf("ping failed for driver %s: %v", claims.UserID, err)
+					logger.Warn("driver_ws_ping", "ping failed", claims.UserID, "", err.Error())
 					return
 				}
 			}
@@ -81,31 +82,18 @@ func DriverWSHandler(w http.ResponseWriter, r *http.Request, hub *commonws.Hub, 
 	go func() {
 		for msg := range client.Send {
 			if err := client.Conn.WriteMessage(websocket.TextMessage, msg); err != nil {
-				log.Printf("Ошибка отправки драйверу %s: %v", client.ID, err)
+				logger.Error("driver_ws_send", "failed to send message to driver", claims.UserID, "", err.Error())
 				break
 			}
 		}
 	}()
-	for {
-		_, msg, err := conn.ReadMessage()
-		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("driver %s disconnected unexpectedly: %v", claims.UserID, err)
-			} else {
-				log.Printf("driver %s disconnected", claims.UserID)
-			}
-			break
-		}
-
-		log.Printf("📨 Message from driver %s: %s", claims.UserID, msg)
-		hub.Broadcast <- msg
-	}
 
 	go hub.ListenDriverMessages(client)
-	go hub.UpdateLocationWS(client)
+	go svc.SendToMq(context.Background())
+	go svc.UpdateLocationWS(context.Background())
 
 	<-done
 	hub.Unregister <- client
 	conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "bye"))
-	log.Printf("🚪 Passenger connection closed: %s", claims.UserID)
+	logger.Info("driver_ws_disconnect", "driver disconnected", claims.UserID, "")
 }

@@ -53,14 +53,13 @@ type DriverResponceWS struct {
 }
 
 type DriverInfo struct {
-	Name    string  `json:"name"`
 	Rating  float64 `json:"rating"`
 	Vehicle Vehicle `json:"vehicle"`
 }
 
 type Vehicle struct {
-	Make  string `json:"make"`
-	Model string `json:"uuid"`
+	Year  int    `json:"year"`
+	Model string `json:"model"`
 	Color string `json:"color"`
-	Plate string `json:"plate"`
+	Brand string `json:"brand"`
 }

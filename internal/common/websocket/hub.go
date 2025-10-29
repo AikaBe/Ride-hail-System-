@@ -2,7 +2,7 @@ package websocket
 
 import (
 	"encoding/json"
-	"log"
+	"ride-hail/internal/common/logger"
 	"ride-hail/internal/common/rmq"
 	DriverModel "ride-hail/internal/driver/model"
 	"strings"
@@ -16,6 +16,7 @@ type Client struct {
 	Conn *websocket.Conn
 	Send chan []byte
 }
+
 type Hub struct {
 	Clients            map[string]*Client
 	Mu                 sync.RWMutex
@@ -28,6 +29,8 @@ type Hub struct {
 }
 
 func NewHub() *Hub {
+	logger.SetServiceName("websocket-hub")
+
 	return &Hub{
 		Clients:            make(map[string]*Client),
 		Register:           make(chan *Client),
@@ -46,17 +49,21 @@ func (h *Hub) Run() {
 			h.Mu.Lock()
 			h.Clients[client.ID] = client
 			h.Mu.Unlock()
+			logger.Info("client_register", "Client connected", "", client.ID)
+
 		case client := <-h.Unregister:
 			h.Mu.Lock()
 			delete(h.Clients, client.ID)
 			h.Mu.Unlock()
+			logger.Info("client_unregister", "Client disconnected", "", client.ID)
+
 		case message := <-h.Broadcast:
 			h.Mu.RLock()
 			for _, c := range h.Clients {
 				select {
 				case c.Send <- message:
 				default:
-					log.Printf("⚠️ Client %s send buffer full", c)
+					logger.Warn("broadcast", "Client send buffer full", "", c.ID, "send channel full")
 				}
 			}
 			h.Mu.RUnlock()
@@ -68,18 +75,19 @@ func (h *Hub) SendToClient(clientID string, message []byte) {
 	h.Mu.RLock()
 	client, ok := h.Clients[clientID]
 	h.Mu.RUnlock()
+
 	if ok {
 		select {
 		case client.Send <- message:
-			log.Printf("✅ Сообщение отправлено клиенту %s: %s", clientID, string(message))
+			logger.Info("send_to_client", "Message sent to client", "", clientID)
 		default:
-			log.Printf("⚠️ Канал переполнен, отключаем клиента %s", clientID)
+			logger.Warn("send_to_client", "Client channel full, unregistering", "", clientID, "send channel full")
 			go func() {
 				h.Unregister <- client
 			}()
 		}
 	} else {
-		log.Printf("❌ Клиент %s не найден в Hub", clientID)
+		logger.Warn("send_to_client", "Client not found in Hub", "", clientID, "not found")
 	}
 }
 
@@ -93,9 +101,9 @@ func (h *Hub) BroadcastRideOffer(msg rmq.RideRequestedMessage) {
 		if strings.HasPrefix(client.ID, "driver_") {
 			select {
 			case client.Send <- data:
-				log.Printf("📨 Ride offer sent to driver %s for ride %s", client.ID, msg.RideID)
+				logger.Info("broadcast_ride_offer", "Ride offer sent to driver", msg.RideID, client.ID)
 			default:
-				log.Printf("⚠️ Channel full, disconnecting driver %s", client.ID)
+				logger.Warn("broadcast_ride_offer", "Driver channel full, disconnecting", msg.RideID, client.ID, "channel full")
 				go func(c *Client) { h.Unregister <- c }(client)
 			}
 		}
@@ -106,18 +114,32 @@ func (h *Hub) ListenDriverMessages(client *Client) {
 	for {
 		_, msg, err := client.Conn.ReadMessage()
 		if err != nil {
-			log.Printf("Ошибка чтения от %s: %v", client.ID, err)
+			logger.Error("driver_ws_read", "Error reading from driver", "", client.ID, err.Error())
 			return
 		}
 
-		var resp DriverModel.DriverResponceWS
-		if err := json.Unmarshal(msg, &resp); err == nil {
-			resp.DriverID = client.ID // на всякий случай
-			h.DriverResponses <- resp // отправляем в канал ответов
-			log.Printf("📩 Ответ от водителя %s: %+v", client.ID, resp)
-		} else {
-			log.Printf("⚠️ Не удалось распарсить сообщение от %s: %s", client.ID, msg)
+		var loc rmq.LocationUpdateMessage
+		if err := json.Unmarshal(msg, &loc); err == nil && loc.DriverID != "" && loc.RideID != "" {
+			if strings.HasPrefix(loc.DriverID, "driver_") {
+				loc.DriverID = strings.TrimPrefix(loc.DriverID, "driver_")
+			}
+			h.UpdateLocation <- loc
+			logger.Info("driver_location", "Received location update", loc.RideID, loc.DriverID)
+			continue
 		}
+
+		var resp DriverModel.DriverResponceWS
+		if err := json.Unmarshal(msg, &resp); err == nil && resp.Type == "ride_response" {
+			resp.DriverID = client.ID
+			if strings.HasPrefix(resp.DriverID, "driver_") {
+				resp.DriverID = strings.TrimPrefix(resp.DriverID, "driver_")
+			}
+			h.DriverResponses <- resp
+			logger.Info("driver_response", "Received driver response", "", resp.DriverID)
+			continue
+		}
+
+		logger.Warn("driver_ws_message", "Unrecognized message from driver", "", client.ID, string(msg))
 	}
 }
 
@@ -125,34 +147,16 @@ func (h *Hub) ListenPassengerMessages(client *Client) {
 	for {
 		_, msg, err := client.Conn.ReadMessage()
 		if err != nil {
-			log.Printf("Ошибка чтения от %s: %v", client.ID, err)
+			logger.Error("passenger_ws_read", "Error reading from passenger", "", client.ID, err.Error())
 			return
 		}
 
 		var resp rmq.PassiNFO
 		if err := json.Unmarshal(msg, &resp); err == nil {
-			h.PassengerResponses <- resp // отправляем в канал ответов
-			log.Printf("📩 Ответ от водителя %s: %+v", client.ID, resp)
+			h.PassengerResponses <- resp
+			logger.Info("passenger_response", "Received passenger response", "", client.ID)
 		} else {
-			log.Printf("⚠️ Не удалось распарсить сообщение от %s: %s", client.ID, msg)
-		}
-	}
-}
-
-func (h *Hub) UpdateLocationWS(client *Client) {
-	for {
-		_, msg, err := client.Conn.ReadMessage()
-		if err != nil {
-			log.Printf("Ошибка чтения от %s: %v", client.ID, err)
-			return
-		}
-
-		var resp rmq.LocationUpdateMessage
-		if err := json.Unmarshal(msg, &resp); err == nil {
-			h.UpdateLocation <- resp
-			log.Printf("📩 Ответ от водителя %s: %+v", client.ID, resp)
-		} else {
-			log.Printf("⚠️ Не удалось распарсить сообщение от %s: %s", client.ID, msg)
+			logger.Warn("passenger_ws_message", "Failed to parse passenger message", "", client.ID, string(msg))
 		}
 	}
 }

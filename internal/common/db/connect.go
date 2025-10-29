@@ -24,12 +24,12 @@ func NewPostgres(host string, port int, user, password, database string) (*Postg
 
 	conn, err := pgx.Connect(ctx, dsn)
 	if err != nil {
-		logger.Error("db_connection_failed", "Failed to connect to Postgres", "", "", err.Error(), "")
+		logger.Error("db_connection_failed", "Failed to connect to Postgres", "", "", err.Error())
 		return nil, fmt.Errorf("failed to connect to postgres: %w", err)
 	}
 
 	if err := conn.Ping(ctx); err != nil {
-		logger.Error("db_ping_failed", "Postgres ping failed", "", "", err.Error(), "")
+		logger.Error("db_ping_failed", "Postgres ping failed", "", "", err.Error())
 		conn.Close(ctx)
 		return nil, fmt.Errorf("postgres ping failed: %w", err)
 	}

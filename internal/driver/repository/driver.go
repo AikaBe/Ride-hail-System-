@@ -33,28 +33,27 @@ func (r *DriverRepository) GetInfo(ctx context.Context, id string) (model.Driver
 	var vehicleAttrs []byte
 
 	err = tx.QueryRow(ctx, `
-		SELECT u.name, d.rating, d.vehicle_attrs
+		SELECT  d.rating, d.vehicle_attrs
 		FROM drivers d
 		JOIN users u ON u.id = d.id
 		WHERE d.id = $1
-	`, id).Scan(&info.Name, &info.Rating, &vehicleAttrs)
+	`, id).Scan(&info.Rating, &vehicleAttrs)
 
 	if err != nil {
 		return model.DriverInfo{}, err
 	}
 
-	// Парсим JSONB с атрибутами автомобиля
 	if err := json.Unmarshal(vehicleAttrs, &info.Vehicle); err != nil {
 		return model.DriverInfo{}, err
 	}
 
-	// Коммит транзакции
 	if err := tx.Commit(ctx); err != nil {
 		return model.DriverInfo{}, err
 	}
 
 	return info, nil
 }
+
 func (r *DriverRepository) GetDriverIDByRideID(ctx context.Context, rideID string) (string, error) {
 	var DriverID string
 
@@ -186,7 +185,7 @@ func (r *DriverRepository) SetOffline(ctx context.Context, driverID uuid.UUID) (
 		WHERE driver_id = $1 AND ended_at IS NULL
 		ORDER BY started_at DESC
 		LIMIT 1
-	`, driverID).Scan(&session.ID, &session.DriverID, &session.StartedAt, &session.TotalRides, &session.TotalEarnings)
+	`, driverID).Scan(&session.ID, &session.StartedAt, &session.TotalRides, &session.TotalEarnings)
 	if err != nil {
 		return model.DriverSession{}, err
 	}
@@ -367,19 +366,11 @@ func (r *DriverRepository) Complete(ctx context.Context, driverID uuid.UUID, dri
 		SET 
 			status = 'COMPLETED',
 			final_fare = $1,
-			final_latitude = $2,
-			final_longitude = $3,
-			actual_distance_km = $4,
-			actual_duration_min = $5,
 			completed_at = now()
-		WHERE driver_id = $6
+		WHERE driver_id = $2
 		RETURNING completed_at
 	`,
 		driverEarning,
-		location.Latitude,
-		location.Longitude,
-		distance,
-		duration,
 		driverID,
 	).Scan(&completedAt)
 
@@ -407,9 +398,9 @@ func (r *DriverRepository) Complete(ctx context.Context, driverID uuid.UUID, dri
 			'RIDE_COMPLETED',
 			jsonb_build_object(
 				'driver_id', $1,
-				'earned', $2,
-				'distance_km', $3,
-				'duration_min', $4,
+				'earned', $2::numeric,
+				'distance_km', $3::numeric,
+				'duration_min', $4::numeric,
 				'completed_at', now()
 			)
 		)

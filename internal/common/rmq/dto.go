@@ -50,16 +50,15 @@ type DriverResponseMessage struct {
 }
 
 type DriverInfo struct {
-	Name    string  `json:"name"`
 	Rating  float64 `json:"rating"`
 	Vehicle Vehicle `json:"vehicle"`
 }
 
 type Vehicle struct {
-	Make  string `json:"make"`
+	Year  int    `json:"year"`
 	Model string `json:"uuid"`
 	Color string `json:"color"`
-	Plate string `json:"plate"`
+	Brand string `json:"brand"`
 }
 
 type DriverLocationUpdateMessage struct {

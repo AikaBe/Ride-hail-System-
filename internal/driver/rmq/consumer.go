@@ -20,7 +20,7 @@ func (c *Client) ConsumeRideRequests(queueName string, handler func(msg rmq.Ride
 		false,
 		nil,
 	); err != nil {
-		logger.Error("rmq_exchange_declare_failed", "Failed to declare exchange", exchange, "", err.Error(), "")
+		logger.Error("rmq_exchange_declare_failed", "Failed to declare exchange", exchange, "", err.Error())
 		return fmt.Errorf("failed to declare exchange: %w", err)
 	}
 	logger.Info("rmq_exchange_declared", "Exchange declared successfully", exchange, "")
@@ -89,7 +89,7 @@ func (c *Client) ConsumePassengerInfo(queueName string, handler func(msg rmq.Pas
 		false,
 		nil,
 	); err != nil {
-		logger.Error("rmq_exchange_declare_failed", "Failed to declare exchange", exchange, "", err.Error(), "")
+		logger.Error("rmq_exchange_declare_failed", "Failed to declare exchange", exchange, "", err.Error())
 		return fmt.Errorf("failed to declare exchange: %w", err)
 	}
 	logger.Info("rmq_exchange_declared", "Exchange declared successfully", exchange, "")
