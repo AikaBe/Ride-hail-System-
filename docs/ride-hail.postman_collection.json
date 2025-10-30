@@ -1,0 +1,481 @@
+{
+	"info": {
+		"_postman_id": "d92b8a76-f231-403a-960c-fdb1d81ccfce",
+		"name": "ride-hail",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "39020310"
+	},
+	"item": [
+		{
+			"name": "User Service",
+			"item": [
+				{
+					"name": "Register Passenger",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"name\": \"Aru M.\",\r\n  \"email\": \"aru@example.com\",\r\n  \"password\": \"securePassword123\",\r\n  \"role\": \"PASSENGER\"\r\n}\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "localhost:8080/register",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"register"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Register Driver",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Parse JSON response\r",
+									"let response = pm.response.json();\r",
+									"\r",
+									"// Сохраняем токены, если они есть в ответе\r",
+									"if (response.user_id) {\r",
+									"    pm.environment.set(\"driver_id\", response.user_id);\r",
+									"    console.log(\"✅ Access token saved:\", response.user_id);\r",
+									"}\r",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"name\": \"Aika B.2\",\r\n  \"email\": \"aika@example.com\",\r\n  \"password\": \"aikaPass456\",\r\n  \"role\": \"DRIVER\",\r\n  \"license_number\": \"777ABS01\",\r\n  \"vehicle_type\": \"XL\",\r\n  \"vehicle_attrs\": {\r\n    \"brand\": \"H\",\r\n    \"model\": \"Elantra\",\r\n    \"year\": 2025,\r\n    \"color\": \"dark grey\"\r\n  }\r\n}\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "localhost:8080/register",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"register"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Login Passenger",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Parse JSON response\r",
+									"let response = pm.response.json();\r",
+									"\r",
+									"// Сохраняем токен, если он есть в ответе\r",
+									"if (response.access_token) {\r",
+									"    pm.environment.set(\"passenger_access_token\", response.access_token);\r",
+									"    console.log(\"✅ Access token saved:\", response.access_token);\r",
+									"}\r",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"email\": \"{{user_email}}\",\r\n  \"password\": \"{{user_password}}\"\r\n}\r\n"
+						},
+						"url": {
+							"raw": "{{base_url}}/login",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Login Driver",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Parse JSON response\r",
+									"let response = pm.response.json();\r",
+									"\r",
+									"// Сохраняем токены, если они есть в ответе\r",
+									"if (response.access_token) {\r",
+									"    pm.environment.set(\"driver_access_token\", response.access_token);\r",
+									"    console.log(\"✅ Access token saved:\", response.access_token);\r",
+									"}\r",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"email\": \"{{driver_email}}\",\r\n  \"password\": \"{{driver_password}}\"\r\n}\r\n"
+						},
+						"url": {
+							"raw": "{{base_url}}/login",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Refresh Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Parse JSON response\r",
+									"let response = pm.response.json();\r",
+									"\r",
+									"// Сохраняем токены, если они есть в ответе\r",
+									"if (response.access_token) {\r",
+									"    pm.environment.set(\"access_token\", response.access_token);\r",
+									"    console.log(\"✅ Access token saved:\", response.access_token);\r",
+									"}\r",
+									"\r",
+									"if (response.refresh_token) {\r",
+									"    pm.environment.set(\"refresh_token\", response.refresh_token);\r",
+									"    console.log(\"✅ Refresh token saved:\", response.refresh_token);\r",
+									"}\r",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"refresh_token\": \"{{refresh_token}}\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/refresh",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"refresh"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Login Admin",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"email\": \"{{admin_email}}\",\r\n  \"password\": \"{{admin_password}}\"\r\n}\r\n"
+						},
+						"url": {
+							"raw": "{{base_url}}/login",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"login"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Ride Service",
+			"item": [
+				{
+					"name": "Create New Ride",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Parse JSON response\r",
+									"let response = pm.response.json();\r",
+									"\r",
+									"// Сохраняем токены, если они есть в ответе\r",
+									"if (response.ride_id) {\r",
+									"    pm.environment.set(\"ride_id\", response.ride_id);\r",
+									"    console.log(\"✅ Access token saved:\", response.ride_id);\r",
+									"}\r",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{passenger_access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"passenger_id\": \"{{passenger_id}}\",\r\n  \"pickup_latitude\": 43.238949,\r\n  \"pickup_longitude\": 76.889709,\r\n  \"pickup_address\": \"Abay Ave 25, Almaty\",\r\n  \"destination_latitude\": 43.256542,\r\n  \"destination_longitude\": 76.928482,\r\n  \"destination_address\": \"Tole Bi St 120, Almaty\",\r\n  \"ride_type\": \"ECONOMY\"\r\n}\r\n"
+						},
+						"url": {
+							"raw": "{{base_url}}/rides",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"rides"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Cancel Ride",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{passenger_access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"reason\": \"Changed my mind\"\r\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/rides/{{ride_id}}/cancel",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"rides",
+								"{{ride_id}}",
+								"cancel"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Driver Service",
+			"item": [
+				{
+					"name": "Set Online/Offline",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{driver_access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"latitude\": 23.916949,\r\n    \"longitude\": 56.483125\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/drivers/{{driver_id}}/online",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"drivers",
+								"{{driver_id}}",
+								"online"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Location",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"latitude\": 43.238949,\r\n  \"longitude\": 76.889709,\r\n  \"accuracy_meters\": 5.0,\r\n  \"speed_kmh\": 45.0,\r\n  \"heading_degrees\": 180.0\r\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/drivers/{{driver_id}}/location",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"drivers",
+								"{{driver_id}}",
+								"location"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Start Ride",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"ride_id\": \"a019e41d-8a30-4ac2-a415-773dee40b993\",\r\n  \"driver_location\": {\r\n    \"latitude\": 43.238949,\r\n    \"longitude\": 76.889709\r\n  }\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/drivers/{{driver_id}}/start",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"drivers",
+								"{{driver_id}}",
+								"start"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Complete Ride",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"ride_id\": \"{{ride_id}}\",\r\n  \"final_location\": {\r\n    \"latitude\": 43.222015,\r\n    \"longitude\": 76.851511\r\n  },\r\n  \"actual_distance_km\": 5.5,\r\n  \"actual_duration_minutes\": 16\r\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/drivers/{{driver_id}}/complete",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"drivers",
+								"{{driver_id}}",
+								"complete"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Admin Service",
+			"item": [
+				{
+					"name": "Get Overview",
+					"request": {
+						"method": "GET",
+						"header": []
+					},
+					"response": []
+				},
+				{
+					"name": "Get Active",
+					"request": {
+						"method": "GET",
+						"header": []
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}
