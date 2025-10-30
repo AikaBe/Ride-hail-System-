@@ -24,14 +24,14 @@ func (h *AdminHandler) GetSystemOverview(w http.ResponseWriter, r *http.Request)
 
 	overview, err := h.service.GetSystemOverview(r.Context())
 	if err != nil {
-		logger.Error(action, "Failed to get system overview", requestID, "", err.Error(), "")
+		logger.Error(action, "Failed to get system overview", requestID, "", err.Error())
 		http.Error(w, "Failed to get system overview", http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(overview); err != nil {
-		logger.Error(action, "Failed to encode response", requestID, "", err.Error(), "")
+		logger.Error(action, "Failed to encode response", requestID, "", err.Error())
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 		return
 	}
@@ -55,14 +55,14 @@ func (h *AdminHandler) GetActiveRides(w http.ResponseWriter, r *http.Request) {
 
 	response, err := h.service.GetActiveRides(r.Context(), page, pageSize)
 	if err != nil {
-		logger.Error(action, "Failed to get active rides", requestID, "", err.Error(), "")
+		logger.Error(action, "Failed to get active rides", requestID, "", err.Error())
 		http.Error(w, "Failed to get active rides", http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(response); err != nil {
-		logger.Error(action, "Failed to encode response", requestID, "", err.Error(), "")
+		logger.Error(action, "Failed to encode response", requestID, "", err.Error())
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 		return
 	}
@@ -76,7 +76,7 @@ func (h *AdminHandler) GetOnlineDrivers(w http.ResponseWriter, r *http.Request) 
 
 	drivers, err := h.service.GetOnlineDrivers(r.Context())
 	if err != nil {
-		logger.Error(action, "Failed to get online drivers", requestID, "", err.Error(), "")
+		logger.Error(action, "Failed to get online drivers", requestID, "", err.Error())
 		http.Error(w, "Failed to get online drivers", http.StatusInternalServerError)
 		return
 	}
@@ -87,7 +87,7 @@ func (h *AdminHandler) GetOnlineDrivers(w http.ResponseWriter, r *http.Request) 
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(drivers); err != nil {
-		logger.Error(action, "Failed to encode response", requestID, "", err.Error(), "")
+		logger.Error(action, "Failed to encode response", requestID, "", err.Error())
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 		return
 	}
@@ -106,7 +106,7 @@ func (h *AdminHandler) GetSystemMetrics(w http.ResponseWriter, r *http.Request) 
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(metrics); err != nil {
-		logger.Error(action, "Failed to encode response", requestID, "", err.Error(), "")
+		logger.Error(action, "Failed to encode response", requestID, "", err.Error())
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 		return
 	}

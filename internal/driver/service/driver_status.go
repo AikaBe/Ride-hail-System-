@@ -93,22 +93,22 @@ func (s *DriverService) SendToMq(ctx context.Context) {
 
 			driverStatus, err := s.repo.GetDriverStatus(ctx, uuid.UUID(resp.DriverID))
 			if err != nil {
-				logger.Error("send_to_mq", "Failed to get driver status", "", resp.DriverID, err.Error())
+				logger.Error("send_to_mq", "Failed to get driver status", "", resp.DriverID, "Failed to get driver status")
 				continue
 			}
-			if driverStatus != "AVAILABLE" {
-				logger.Error("send_to_mq", "Driver doesn't available", resp.DriverID, resp.RideID, err.Error())
+			if driverStatus != usermodel.DriverStatusAvailable {
+				logger.Error("send_to_mq", "Driver doesn't available", resp.DriverID, resp.RideID, "driver not available")
 				continue
 			}
 			driverInfo, err := s.repo.GetInfo(ctx, resp.DriverID)
 			if err != nil {
-				logger.Error("send_to_mq", "Failed to get driver info", resp.DriverID, resp.RideID, err.Error())
+				logger.Error("send_to_mq", "Failed to get driver info", resp.DriverID, resp.RideID, "Failed to get driver info")
 				continue
 			}
 
 			pickupLat, pickupLng, err := s.repo.GetPickupLocation(ctx, resp.RideID)
 			if err != nil {
-				logger.Error("send_to_mq", "Failed to get pickup coordinates", resp.DriverID, resp.RideID, err.Error())
+				logger.Error("send_to_mq", "Failed to get pickup coordinates", resp.DriverID, resp.RideID, "Failed to get pickup coordinates")
 				continue
 			}
 

@@ -318,6 +318,16 @@ func (r *DriverRepository) Start(ctx context.Context, driverID uuid.UUID, rideID
 		return "", time.Time{}, fmt.Errorf("failed to update ride: %w", err)
 	}
 
+	eventQuery := `
+		INSERT INTO ride_events (ride_id, event_type, event_data, created_at)
+		VALUES ($1, 'RIDE_STARTED', json_build_object('driver_id', $2::text), now());
+	`
+
+	_, err = tx.Exec(ctx, eventQuery, rideID, driverID)
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("failed to insert ride event: %w", err)
+	}
+
 	newStatus := usermodel.DriverStatus("BUSY")
 	_, err = tx.Exec(ctx, `
 		UPDATE drivers

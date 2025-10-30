@@ -34,14 +34,6 @@ func (h *DriverHandler) GetDriverInfo(ctx context.Context, driverID string) (mod
 	return driverInfo, nil
 }
 
-func (h *DriverHandler) GetDriverInfo(ctx context.Context, driverID string) (model.DriverInfo, error) {
-	driverInfo, err := h.service.GetDriverInfo(ctx, driverID)
-	if err != nil {
-		return model.DriverInfo{}, err
-	}
-	return driverInfo, nil
-}
-
 func (h *DriverHandler) GoOnline(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	driverID := r.PathValue("driver_id")

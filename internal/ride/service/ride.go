@@ -28,6 +28,7 @@ type RideRepository interface {
 	GetPassengerIDByRideID(ctx context.Context, rideID string) (string, error)
 	BeginTx(ctx context.Context) (pgx.Tx, error)
 	UpdateRideStatusMatched(ctx context.Context, rideID string, driverID string) error
+	UpdateLocation(ctx context.Context, rideID, passengerID string) error
 }
 
 type RideService struct {
@@ -114,6 +115,12 @@ func (s *RideService) LocationUpdate(ctx context.Context, queueName string) {
 		passengerID, err := s.repo.GetPassengerIDByRideID(ctx, msg.RideID)
 		if err != nil {
 			logger.Error("get_passenger_id_failed", "не удалось получить passenger_id", "", msg.RideID, err.Error())
+			return
+		}
+
+		err = s.repo.UpdateRideStatusMatched(ctx, msg.RideID, msg.DriverID)
+		if err != nil {
+			logger.Error("insert updated location", "cannot insert new location to db", "", msg.RideID, err.Error())
 			return
 		}
 

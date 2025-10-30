@@ -28,6 +28,28 @@ func (r *RideRepository) BeginTx(ctx context.Context) (pgx.Tx, error) {
 	return tx, nil
 }
 
+func (r *RideRepository) UpdateLocation(ctx context.Context, rideID, passengerID string) error {
+	tx, err := r.DB.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	eventQuery := `
+		INSERT INTO ride_events (ride_id, event_type, event_data, created_at)
+		VALUES ($1, 'LOCATION_UPDATED', json_build_object('passengerID', $2::text), now());
+	`
+
+	_, err = tx.Exec(ctx, eventQuery, rideID, passengerID)
+	if err != nil {
+		return fmt.Errorf("failed to insert ride event: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return nil
+}
+
 func (r *RideRepository) GetPassengerIDByRideID(ctx context.Context, rideID string) (string, error) {
 	var passengerID string
 
