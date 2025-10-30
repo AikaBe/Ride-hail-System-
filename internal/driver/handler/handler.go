@@ -8,16 +8,18 @@ import (
 	"ride-hail/internal/driver/handler/dto"
 	"ride-hail/internal/driver/model"
 	"ride-hail/internal/driver/service"
+	"ride-hail/internal/user/jwt"
 	usermodel "ride-hail/internal/user/model"
 	"ride-hail/pkg/uuid"
 )
 
 type DriverHandler struct {
-	service *service.DriverService
+	service    *service.DriverService
+	jwtManager *jwt.Manager
 }
 
-func NewHandler(s *service.DriverService) *DriverHandler {
-	return &DriverHandler{service: s}
+func NewHandler(s *service.DriverService, jwtManager *jwt.Manager) *DriverHandler {
+	return &DriverHandler{service: s, jwtManager: jwtManager}
 }
 
 func (h *DriverHandler) GetDriverInfo(ctx context.Context, driverID string) (model.DriverInfo, error) {
@@ -35,6 +37,17 @@ func (h *DriverHandler) GoOnline(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	driverID := r.PathValue("driver_id")
 	logger.Info("go_online", "Driver attempting to go online", "", driverID)
+
+	claims, err := h.jwtManager.ExtractClaims(w, r)
+
+	if claims.ID != driverID {
+		http.Error(w, "forbidden: token does not match driver", http.StatusForbidden)
+		return
+	}
+	if claims.Role != string(usermodel.RoleDriver) {
+		http.Error(w, "forbidden: not authorized", http.StatusUnauthorized)
+		return
+	}
 
 	var req dto.OnlineRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -72,6 +85,17 @@ func (h *DriverHandler) GoOffline(w http.ResponseWriter, r *http.Request) {
 	driverID := r.PathValue("driver_id")
 	logger.Info("go_offline", "Driver attempting to go offline", "", driverID)
 
+	claims, err := h.jwtManager.ExtractClaims(w, r)
+
+	if claims.ID != driverID {
+		http.Error(w, "forbidden: token does not match driver", http.StatusForbidden)
+		return
+	}
+	if claims.Role != string(usermodel.RoleDriver) {
+		http.Error(w, "forbidden: not authorized", http.StatusUnauthorized)
+		return
+	}
+
 	session, durationHours, err := h.service.GoOffline(ctx, uuid.UUID(driverID))
 	if err != nil {
 		logger.Error("go_offline", "Failed to set driver offline", "", driverID, err.Error())
@@ -105,6 +129,17 @@ func (h *DriverHandler) UpdateLocation(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	driverID := r.PathValue("driver_id")
 	logger.Debug("update_location", "Driver updating location", "", driverID)
+
+	claims, err := h.jwtManager.ExtractClaims(w, r)
+
+	if claims.ID != driverID {
+		http.Error(w, "forbidden: token does not match driver", http.StatusForbidden)
+		return
+	}
+	if claims.Role != string(usermodel.RoleDriver) {
+		http.Error(w, "forbidden: not authorized", http.StatusUnauthorized)
+		return
+	}
 
 	var req dto.LocationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -145,6 +180,17 @@ func (h *DriverHandler) Start(w http.ResponseWriter, r *http.Request) {
 	driverID := r.PathValue("driver_id")
 	logger.Info("start_ride", "Driver starting ride", "", driverID)
 
+	claims, err := h.jwtManager.ExtractClaims(w, r)
+
+	if claims.ID != driverID {
+		http.Error(w, "forbidden: token does not match driver", http.StatusForbidden)
+		return
+	}
+	if claims.Role != string(usermodel.RoleDriver) {
+		http.Error(w, "forbidden: not authorized", http.StatusUnauthorized)
+		return
+	}
+
 	var req dto.StartRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		logger.Warn("start_ride", "Invalid request body", "", driverID, err.Error())
@@ -173,6 +219,17 @@ func (h *DriverHandler) Complete(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	driverID := r.PathValue("driver_id")
 	logger.Info("complete_ride", "Driver completing ride", "", driverID)
+
+	claims, err := h.jwtManager.ExtractClaims(w, r)
+
+	if claims.ID != driverID {
+		http.Error(w, "forbidden: token does not match driver", http.StatusForbidden)
+		return
+	}
+	if claims.Role != string(usermodel.RoleDriver) {
+		http.Error(w, "forbidden: not authorized", http.StatusUnauthorized)
+		return
+	}
 
 	var req dto.CompleteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

@@ -89,47 +89,6 @@ func (r *DriverRepository) GetPickupLocation(ctx context.Context, rideID string)
 	return lat, lng, nil
 }
 
-func (r *DriverRepository) FindNearbyDrivers(ctx context.Context, pickup model.Location, vehicleType usermodel.VehicleType, radiusMeters float64) ([]model.DriverNearby, error) {
-	query := `
-		SELECT d.id, u.email, d.rating, c.latitude, c.longitude,
-		       ST_Distance(
-		         ST_MakePoint(c.longitude, c.latitude)::geography,
-		         ST_MakePoint($1, $2)::geography
-		       ) / 1000 AS distance_km
-		FROM drivers d
-		JOIN users u ON d.id = u.id
-		JOIN coordinates c ON c.entity_id = d.id
-		  AND c.entity_type = 'driver'
-		  AND c.is_current = true
-		WHERE d.status = 'AVAILABLE'
-		  AND d.vehicle_type = $3
-		  AND ST_DWithin(
-		        ST_MakePoint(c.longitude, c.latitude)::geography,
-		        ST_MakePoint($1, $2)::geography,
-		        $4
-		      )
-		ORDER BY distance_km, d.rating DESC
-		LIMIT 10;
-	`
-
-	rows, err := r.db.Query(ctx, query, pickup.Longitude, pickup.Latitude, vehicleType, radiusMeters)
-	if err != nil {
-		return nil, fmt.Errorf("query failed: %w", err)
-	}
-	defer rows.Close()
-
-	var drivers []model.DriverNearby
-	for rows.Next() {
-		var d model.DriverNearby
-		if err := rows.Scan(&d.ID, &d.Email, &d.Rating, &d.Latitude, &d.Longitude, &d.Distance); err != nil {
-			return nil, fmt.Errorf("scan error: %w", err)
-		}
-		drivers = append(drivers, d)
-	}
-
-	return drivers, nil
-}
-
 func (r *DriverRepository) SetOnline(ctx context.Context, driverID uuid.UUID, lat, lon float64) (model.DriverSession, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
@@ -139,10 +98,10 @@ func (r *DriverRepository) SetOnline(ctx context.Context, driverID uuid.UUID, la
 
 	var session model.DriverSession
 	err = tx.QueryRow(ctx, `
-		INSERT INTO driver_sessions (driver_id,started_at)
+		INSERT INTO driver_sessions (driver_id, started_at)
 		VALUES ($1,now())
 		RETURNING id
-	`, driverID).Scan(&session.ID, &session.DriverID, &session.StartedAt)
+	`, driverID).Scan(&session.ID)
 	if err != nil {
 		return model.DriverSession{}, err
 	}
@@ -302,6 +261,7 @@ func (r *DriverRepository) Start(ctx context.Context, driverID uuid.UUID, rideID
 	err = tx.QueryRow(ctx, `
 	UPDATE rides
 	SET status = 'IN_PROGRESS',
+	    arrived_at = now(),
 	    started_at = now(),
 	    updated_at = now()
 	WHERE id = $1
@@ -389,6 +349,18 @@ func (r *DriverRepository) Complete(ctx context.Context, driverID uuid.UUID, dri
 	`, driverEarning, driverID)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("failed to update driver stats: %w", err)
+	}
+
+	_, err = tx.Exec(ctx, `
+		UPDATE driver_sessions
+		SET 
+			total_rides = total_rides + 1,
+			total_earnings = total_earnings + $1,
+			ended_at = now()
+		WHERE id = $2
+	`, driverEarning, driverID)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("failed to update driver_sessions stats: %w", err)
 	}
 
 	_, err = tx.Exec(ctx, `

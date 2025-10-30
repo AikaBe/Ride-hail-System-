@@ -3,6 +3,8 @@ package jwt
 import (
 	"errors"
 	"github.com/golang-jwt/jwt/v5"
+	"net/http"
+	"strings"
 	"time"
 )
 
@@ -97,5 +99,29 @@ func (m *Manager) ValidateToken(tokenString string) (*Claims, error) {
 		return nil, errors.New("invalid token")
 	}
 
+	return claims, nil
+}
+
+func (m *Manager) ExtractClaims(w http.ResponseWriter, r *http.Request) (*Claims, error) {
+
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		http.Error(w, "missing Authorization header", http.StatusUnauthorized)
+		return nil, errors.New("missing Authorization header")
+	}
+
+	parts := strings.Split(authHeader, " ")
+	if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
+		http.Error(w, "invalid Authorization header format", http.StatusUnauthorized)
+		return nil, errors.New("invalid Authorization header")
+	}
+
+	accessToken := parts[1]
+
+	claims, err := m.ValidateToken(accessToken)
+	if err != nil {
+		http.Error(w, "invalid or expired token", http.StatusUnauthorized)
+		return nil, errors.New("invalid or expired token")
+	}
 	return claims, nil
 }

@@ -30,7 +30,7 @@ func RunDriver(cfg *config.Config, conn *pgx.Conn, commonMq *commonrmq.RabbitMQ,
 
 	repo := repository.NewDriverRepository(conn)
 	svc := service.NewDriverService(repo, rmqClient, hub)
-	h := handler.NewHandler(svc)
+	h := handler.NewHandler(svc, jwtManager)
 
 	mux.HandleFunc("POST /drivers/{driver_id}/online", h.GoOnline)
 	mux.HandleFunc("POST /drivers/{driver_id}/offline", h.GoOffline)

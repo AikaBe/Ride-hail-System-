@@ -20,7 +20,6 @@ import (
 )
 
 type DriverRepository interface {
-	FindNearbyDrivers(ctx context.Context, pickup model.Location, vehicleType usermodel.VehicleType, radiusMeters float64) ([]model.DriverNearby, error)
 	SetOnline(ctx context.Context, driverID uuid.UUID, lat, lon float64) (model.DriverSession, error)
 	SetOffline(ctx context.Context, driverID uuid.UUID) (model.DriverSession, error)
 	SaveLocation(ctx context.Context, location model.LocationHistory) (model2.Coordinate, error)

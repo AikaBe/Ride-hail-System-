@@ -7,19 +7,30 @@ import (
 	"ride-hail/internal/common/logger"
 	"ride-hail/internal/ride/handler/dto"
 	"ride-hail/internal/ride/service"
+	"ride-hail/internal/user/jwt"
+
+	usermodel "ride-hail/internal/user/model"
 )
 
 type RideHandler struct {
 	RideService *service.RideService
+	jwtManager  *jwt.Manager
 }
 
-func NewRideHandler(service *service.RideService) *RideHandler {
-	return &RideHandler{RideService: service}
+func NewRideHandler(service *service.RideService, manager *jwt.Manager) *RideHandler {
+	return &RideHandler{RideService: service, jwtManager: manager}
 }
 
 func (h *RideHandler) CreateRide(w http.ResponseWriter, r *http.Request) {
 	const action = "CreateRide"
 	requestID := r.Header.Get("X-Request-ID") // если есть requestID из заголовка
+
+	claims, err := h.jwtManager.ExtractClaims(w, r)
+
+	if claims.Role != string(usermodel.RolePassenger) {
+		http.Error(w, "forbidden: not authorized", http.StatusUnauthorized)
+		return
+	}
 
 	var req dto.RideRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -63,6 +74,13 @@ func (h *RideHandler) CreateRide(w http.ResponseWriter, r *http.Request) {
 func (h *RideHandler) CancelRide(w http.ResponseWriter, r *http.Request) {
 	const action = "CancelRide"
 	requestID := r.Header.Get("X-Request-ID")
+
+	claims, err := h.jwtManager.ExtractClaims(w, r)
+
+	if claims.Role != string(usermodel.RolePassenger) {
+		http.Error(w, "forbidden: not authorized", http.StatusUnauthorized)
+		return
+	}
 
 	rideID := r.PathValue("ride_id")
 	if rideID == "" {
