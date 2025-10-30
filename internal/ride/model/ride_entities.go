@@ -2,9 +2,10 @@ package model
 
 import (
 	"encoding/json"
+	"time"
+
 	usermodel "ride-hail/internal/user/model"
 	"ride-hail/pkg/uuid"
-	"time"
 )
 
 type Coordinate struct {

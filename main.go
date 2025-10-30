@@ -5,6 +5,9 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"syscall"
+	"time"
+
 	cmdAdmin "ride-hail/cmd/admin-service"
 	cmdDriver "ride-hail/cmd/driver-location-service"
 	cmdRide "ride-hail/cmd/ride-service"
@@ -15,8 +18,6 @@ import (
 	"ride-hail/internal/common/rmq"
 	"ride-hail/internal/common/websocket"
 	"ride-hail/internal/user/jwt"
-	"syscall"
-	"time"
 )
 
 func main() {

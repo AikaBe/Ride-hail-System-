@@ -6,10 +6,11 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"ride-hail/internal/common/logger"
 	"sort"
 	"strings"
 	"time"
+
+	"ride-hail/internal/common/logger"
 )
 
 func (p *Postgres) RunMigrations(migrationsDir string) error {

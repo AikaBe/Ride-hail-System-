@@ -6,6 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
+	"time"
+
 	"ride-hail/internal/common/logger"
 	commonmq "ride-hail/internal/common/rmq"
 	"ride-hail/internal/common/websocket"
@@ -15,8 +18,6 @@ import (
 	model2 "ride-hail/internal/ride/model"
 	usermodel "ride-hail/internal/user/model"
 	"ride-hail/pkg/uuid"
-	"strings"
-	"time"
 )
 
 type DriverRepository interface {

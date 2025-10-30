@@ -3,8 +3,9 @@ package rmq
 import (
 	"fmt"
 	"math"
-	"ride-hail/internal/common/logger"
 	"time"
+
+	"ride-hail/internal/common/logger"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )

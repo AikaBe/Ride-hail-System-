@@ -1,8 +1,9 @@
 package model
 
 import (
-	"ride-hail/pkg/uuid"
 	"time"
+
+	"ride-hail/pkg/uuid"
 )
 
 type DriverSession struct {

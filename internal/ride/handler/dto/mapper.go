@@ -2,6 +2,7 @@ package dto
 
 import (
 	"fmt"
+
 	"ride-hail/internal/ride/model"
 	usermodel "ride-hail/internal/user/model"
 	"ride-hail/pkg/uuid"

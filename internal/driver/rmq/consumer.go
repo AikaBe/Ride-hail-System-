@@ -3,6 +3,7 @@ package rmq
 import (
 	"encoding/json"
 	"fmt"
+
 	"ride-hail/internal/common/logger"
 	"ride-hail/internal/common/rmq"
 )

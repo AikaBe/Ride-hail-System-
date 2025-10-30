@@ -3,6 +3,7 @@ package driver_location_service
 import (
 	"context"
 	"net/http"
+
 	"ride-hail/internal/common/config"
 	"ride-hail/internal/common/logger"
 	commonrmq "ride-hail/internal/common/rmq"
@@ -19,7 +20,7 @@ import (
 
 func RunDriver(cfg *config.Config, conn *pgx.Conn, commonMq *commonrmq.RabbitMQ, mux *http.ServeMux, hub *websocket.Hub, wsMux *http.ServeMux, jwtManager *jwt.Manager) {
 	logger.SetServiceName("driver-location-service")
-	
+
 	logger.Info("startup", "Starting Driver & Location Service...", "", "")
 
 	rmqClient, err := driverrmq.NewClient(commonMq.URL, "driver_topic")

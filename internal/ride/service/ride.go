@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"time"
+
 	"ride-hail/internal/common/logger"
 	common "ride-hail/internal/common/rmq"
 	"ride-hail/internal/common/websocket"
@@ -15,7 +17,6 @@ import (
 
 	"ride-hail/internal/ride/repository"
 	rmqClient "ride-hail/internal/ride/rmq"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -72,7 +73,6 @@ func (s *RideService) ListenForDriver(ctx context.Context, queueName string) {
 				fmt.Sprintf("driver_id=%s", msg.DriverID))
 		}
 	})
-
 	if err != nil {
 		logger.Error("consume_driver_responses_failed",
 			fmt.Sprintf("ошибка при чтении сообщений очереди %s", queueName),
@@ -125,7 +125,6 @@ func (s *RideService) LocationUpdate(ctx context.Context, queueName string) {
 
 		s.wsHub.SendToClient(passId, data)
 	})
-
 	if err != nil {
 		logger.Error("consume_location_failed",
 			fmt.Sprintf("ошибка при чтении сообщений очереди %s", queueName),

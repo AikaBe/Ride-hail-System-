@@ -3,8 +3,9 @@ package repository
 import (
 	"context"
 	"fmt"
-	"ride-hail/internal/admin/model"
 	"time"
+
+	"ride-hail/internal/admin/model"
 
 	"github.com/jackc/pgx/v5"
 )

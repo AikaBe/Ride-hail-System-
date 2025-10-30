@@ -2,6 +2,7 @@ package rmq
 
 import (
 	"fmt"
+
 	"ride-hail/internal/common/logger"
 
 	amqp "github.com/rabbitmq/amqp091-go"

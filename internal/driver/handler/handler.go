@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+
 	"ride-hail/internal/common/logger"
 	"ride-hail/internal/driver/handler/dto"
 	"ride-hail/internal/driver/model"

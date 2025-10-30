@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/bcrypt"
 	"ride-hail/internal/common/logger"

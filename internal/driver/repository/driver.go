@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
+
 	"ride-hail/internal/driver/model"
 	ridemodel "ride-hail/internal/ride/model"
 	usermodel "ride-hail/internal/user/model"
 	"ride-hail/pkg/uuid"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -38,7 +39,6 @@ func (r *DriverRepository) GetInfo(ctx context.Context, id string) (model.Driver
 		JOIN users u ON u.id = d.id
 		WHERE d.id = $1
 	`, id).Scan(&info.Rating, &vehicleAttrs)
-
 	if err != nil {
 		return model.DriverInfo{}, err
 	}
@@ -380,7 +380,6 @@ func (r *DriverRepository) Complete(ctx context.Context, driverID uuid.UUID, dri
 		driverEarning,
 		driverID,
 	).Scan(&completedAt)
-
 	if err != nil {
 		return time.Time{}, fmt.Errorf("failed to update ride: %w", err)
 	}
@@ -442,7 +441,6 @@ func (r *DriverRepository) GetRideStatus(ctx context.Context, driverID, rideID u
 		FROM rides 
 		WHERE id = $1 AND driver_id = $2
 	`, rideID, driverID).Scan(&status)
-
 	if err != nil {
 		return "", fmt.Errorf("failed to get ride status: %w", err)
 	}

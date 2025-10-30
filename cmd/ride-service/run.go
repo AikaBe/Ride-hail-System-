@@ -3,6 +3,7 @@ package ride_service
 import (
 	"context"
 	"net/http"
+
 	"ride-hail/internal/common/config"
 	"ride-hail/internal/common/logger"
 	commonrmq "ride-hail/internal/common/rmq"

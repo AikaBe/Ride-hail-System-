@@ -1,8 +1,9 @@
 package rmq
 
 import (
-	usermodel "ride-hail/internal/user/model"
 	"time"
+
+	usermodel "ride-hail/internal/user/model"
 )
 
 type RideRequestedMessage struct {

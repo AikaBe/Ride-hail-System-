@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 	"math"
+
 	"ride-hail/internal/ride/model"
 	usermodel "ride-hail/internal/user/model"
 )

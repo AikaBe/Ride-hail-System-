@@ -3,11 +3,12 @@ package websocket
 import (
 	"context"
 	"net/http"
+	"time"
+
 	"ride-hail/internal/common/logger"
 	commonws "ride-hail/internal/common/websocket"
 	"ride-hail/internal/ride/service"
 	"ride-hail/internal/user/jwt"
-	"time"
 
 	"github.com/gorilla/websocket"
 )

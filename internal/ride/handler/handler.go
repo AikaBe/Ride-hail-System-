@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+
 	"ride-hail/internal/common/logger"
 	"ride-hail/internal/ride/handler/dto"
 	"ride-hail/internal/ride/service"
@@ -71,6 +72,7 @@ func (h *RideHandler) CreateRide(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to encode response", http.StatusInternalServerError)
 	}
 }
+
 func (h *RideHandler) CancelRide(w http.ResponseWriter, r *http.Request) {
 	const action = "CancelRide"
 	requestID := r.Header.Get("X-Request-ID")

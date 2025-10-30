@@ -2,11 +2,12 @@ package websocket
 
 import (
 	"encoding/json"
+	"strings"
+	"sync"
+
 	"ride-hail/internal/common/logger"
 	"ride-hail/internal/common/rmq"
 	DriverModel "ride-hail/internal/driver/model"
-	"strings"
-	"sync"
 
 	"github.com/gorilla/websocket"
 )
