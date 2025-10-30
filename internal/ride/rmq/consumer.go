@@ -3,6 +3,7 @@ package rmq
 import (
 	"encoding/json"
 	"fmt"
+	"ride-hail/internal/common/logger"
 	"ride-hail/internal/common/rmq"
 )
 
@@ -19,6 +20,7 @@ func (c *Client) ConsumeDriverResponses(queueName string, handler func(msg rmq.D
 		false,
 		nil,
 	); err != nil {
+		logger.Error("consume_driver_response", "failed to declare exchange", "", "", err.Error())
 		return fmt.Errorf("failed to declare exchange: %w", err)
 	}
 
@@ -31,6 +33,7 @@ func (c *Client) ConsumeDriverResponses(queueName string, handler func(msg rmq.D
 		nil,
 	)
 	if err != nil {
+		logger.Error("consume_driver_response", "failed to declare queue", "", "", err.Error())
 		return fmt.Errorf("failed to declare queue: %w", err)
 	}
 
@@ -41,6 +44,7 @@ func (c *Client) ConsumeDriverResponses(queueName string, handler func(msg rmq.D
 		false,
 		nil,
 	); err != nil {
+		logger.Error("consume_driver_response", "failed to bind queue", "", "", err.Error())
 		return fmt.Errorf("failed to bind queue: %w", err)
 	}
 
@@ -54,16 +58,20 @@ func (c *Client) ConsumeDriverResponses(queueName string, handler func(msg rmq.D
 		nil,
 	)
 	if err != nil {
+		logger.Error("consume_driver_response", "failed to start consuming", "", "", err.Error())
 		return fmt.Errorf("failed to start consuming: %w", err)
 	}
+
+	logger.Info("consume_driver_response", "started consuming driver responses", "", "")
 
 	go func() {
 		for d := range deliveries {
 			var msg rmq.DriverResponseMessage
 			if err := json.Unmarshal(d.Body, &msg); err != nil {
-				fmt.Printf("WARN: failed to unmarshal driver response: %v\n", err)
+				logger.Warn("consume_driver_response", "failed to unmarshal driver response", "", "", err.Error())
 				continue
 			}
+			logger.Debug("consume_driver_response", "received driver response message", "", msg.RideID)
 			handler(msg)
 		}
 	}()
@@ -84,6 +92,7 @@ func (c *Client) ConsumeDriverStatus(queueName string, handler func(msg rmq.Ride
 		false,
 		nil,
 	); err != nil {
+		logger.Error("consume_driver_status", "failed to declare exchange", "", "", err.Error())
 		return fmt.Errorf("failed to declare exchange: %w", err)
 	}
 
@@ -96,6 +105,7 @@ func (c *Client) ConsumeDriverStatus(queueName string, handler func(msg rmq.Ride
 		nil,
 	)
 	if err != nil {
+		logger.Error("consume_driver_status", "failed to declare queue", "", "", err.Error())
 		return fmt.Errorf("failed to declare queue: %w", err)
 	}
 
@@ -106,6 +116,7 @@ func (c *Client) ConsumeDriverStatus(queueName string, handler func(msg rmq.Ride
 		false,
 		nil,
 	); err != nil {
+		logger.Error("consume_driver_status", "failed to bind queue", "", "", err.Error())
 		return fmt.Errorf("failed to bind queue: %w", err)
 	}
 
@@ -119,16 +130,20 @@ func (c *Client) ConsumeDriverStatus(queueName string, handler func(msg rmq.Ride
 		nil,
 	)
 	if err != nil {
+		logger.Error("consume_driver_status", "failed to start consuming", "", "", err.Error())
 		return fmt.Errorf("failed to start consuming: %w", err)
 	}
+
+	logger.Info("consume_driver_status", "started consuming driver statuses", "", "")
 
 	go func() {
 		for d := range deliveries {
 			var msg rmq.RideStatusUpdateMessage
 			if err := json.Unmarshal(d.Body, &msg); err != nil {
-				fmt.Printf("WARN: failed to unmarshal driver status: %v\n", err)
+				logger.Warn("consume_driver_status", "failed to unmarshal driver status", "", "", err.Error())
 				continue
 			}
+			logger.Debug("consume_driver_status", "received driver status message", "", msg.RideID)
 			handler(msg)
 		}
 	}()
@@ -149,6 +164,7 @@ func (c *Client) ConsumeLocationUpdates(queueName string, handler func(msg rmq.L
 		false,
 		nil,
 	); err != nil {
+		logger.Error("consume_location", "failed to declare exchange", "", "", err.Error())
 		return fmt.Errorf("failed to declare exchange: %w", err)
 	}
 
@@ -161,6 +177,7 @@ func (c *Client) ConsumeLocationUpdates(queueName string, handler func(msg rmq.L
 		nil,
 	)
 	if err != nil {
+		logger.Error("consume_location", "failed to declare queue", "", "", err.Error())
 		return fmt.Errorf("failed to declare queue: %w", err)
 	}
 
@@ -171,6 +188,7 @@ func (c *Client) ConsumeLocationUpdates(queueName string, handler func(msg rmq.L
 		false,
 		nil,
 	); err != nil {
+		logger.Error("consume_location", "failed to bind queue", "", "", err.Error())
 		return fmt.Errorf("failed to bind queue: %w", err)
 	}
 
@@ -184,16 +202,20 @@ func (c *Client) ConsumeLocationUpdates(queueName string, handler func(msg rmq.L
 		nil,
 	)
 	if err != nil {
+		logger.Error("consume_location", "failed to start consuming", "", "", err.Error())
 		return fmt.Errorf("failed to start consuming: %w", err)
 	}
+
+	logger.Info("consume_location", "started consuming location updates", "", "")
 
 	go func() {
 		for d := range deliveries {
 			var msg rmq.LocationUpdateMessage
 			if err := json.Unmarshal(d.Body, &msg); err != nil {
-				fmt.Printf("WARN: failed to unmarshal location update: %v\n", err)
+				logger.Warn("consume_location", "failed to unmarshal location update", "", "", err.Error())
 				continue
 			}
+			logger.Debug("consume_location", "received location update message", "", msg.RideID)
 			handler(msg)
 		}
 	}()

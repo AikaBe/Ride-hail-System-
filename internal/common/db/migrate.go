@@ -18,11 +18,10 @@ func (p *Postgres) RunMigrations(migrationsDir string) error {
 
 	files, err := readMigrationFiles(migrationsDir)
 	if err != nil {
-		logger.Error("db_migrations_read_failed", "Failed to read migration files", "", "", err.Error(), "")
+		logger.Error("db_migrations_read_failed", "Failed to read migration files", "", "", err.Error())
 		return fmt.Errorf("failed to read migration files: %w", err)
 	}
 
-	// 1️⃣ Создаём таблицу для учёта миграций (если нет)
 	_, err = p.Conn.Exec(context.Background(), `
 		CREATE TABLE IF NOT EXISTS _migrations (
 			id SERIAL PRIMARY KEY,
@@ -31,15 +30,14 @@ func (p *Postgres) RunMigrations(migrationsDir string) error {
 		)
 	`)
 	if err != nil {
-		logger.Error("db_migrations_table_failed", "Failed to ensure _migrations table", "", "", err.Error(), "")
+		logger.Error("db_migrations_table_failed", "Failed to ensure _migrations table", "", "", err.Error())
 		return fmt.Errorf("failed to create _migrations table: %w", err)
 	}
 
-	// 2️⃣ Получаем список уже выполненных миграций
 	executed := make(map[string]bool)
 	rows, err := p.Conn.Query(context.Background(), "SELECT filename FROM _migrations")
 	if err != nil {
-		logger.Error("db_migrations_query_failed", "Failed to fetch applied migrations", "", "", err.Error(), "")
+		logger.Error("db_migrations_query_failed", "Failed to fetch applied migrations", "", "", err.Error())
 		return fmt.Errorf("failed to query applied migrations: %w", err)
 	}
 	defer rows.Close()
@@ -52,7 +50,6 @@ func (p *Postgres) RunMigrations(migrationsDir string) error {
 		executed[fname] = true
 	}
 
-	// 3️⃣ Применяем только те, что ещё не выполнены
 	for _, file := range files {
 		name := filepath.Base(file)
 		if executed[name] {
@@ -62,7 +59,7 @@ func (p *Postgres) RunMigrations(migrationsDir string) error {
 
 		content, err := os.ReadFile(file)
 		if err != nil {
-			logger.Error("db_migration_read_file_failed", fmt.Sprintf("Failed to read migration file %s", name), "", "", err.Error(), "")
+			logger.Error("db_migration_read_file_failed", fmt.Sprintf("Failed to read migration file %s", name), "", "", err.Error())
 			return fmt.Errorf("failed to read migration file %s: %w", name, err)
 		}
 
@@ -72,14 +69,12 @@ func (p *Postgres) RunMigrations(migrationsDir string) error {
 			return fmt.Errorf("failed to start migration transaction: %w", err)
 		}
 
-		// выполняем SQL из файла
 		if _, err := tx.Exec(context.Background(), string(content)); err != nil {
 			tx.Rollback(context.Background())
-			logger.Error("db_migration_failed", fmt.Sprintf("Migration %s failed", name), "", "", err.Error(), "")
+			logger.Error("db_migration_failed", fmt.Sprintf("Migration %s failed", name), "", "", err.Error())
 			return fmt.Errorf("migration %s failed: %w", name, err)
 		}
 
-		// записываем факт применения миграции
 		if _, err := tx.Exec(context.Background(),
 			"INSERT INTO _migrations (filename) VALUES ($1)", name); err != nil {
 			tx.Rollback(context.Background())

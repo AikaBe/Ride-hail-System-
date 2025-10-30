@@ -54,8 +54,6 @@ websocket login
 "ride_type": "ECONOMY"
 }
 
-
-
 After matching passenger send info
 {
 "type": "ride_details",

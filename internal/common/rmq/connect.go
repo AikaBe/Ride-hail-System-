@@ -35,7 +35,7 @@ func (r *RabbitMQ) connect() error {
 			ch, chErr := conn.Channel()
 			if chErr != nil {
 				_ = conn.Close()
-				logger.Error("rmq_channel_failed", "Failed to open channel", "", "", chErr.Error(), "")
+				logger.Error("rmq_channel_failed", "Failed to open channel", "", "", chErr.Error())
 				return fmt.Errorf("failed to open channel: %w", chErr)
 			}
 			r.Conn = conn
@@ -44,7 +44,7 @@ func (r *RabbitMQ) connect() error {
 			return nil
 		}
 
-		time.Sleep(time.Second * time.Duration(math.Pow(2, float64(i)))) // exponential backoff
+		time.Sleep(time.Second * time.Duration(math.Pow(2, float64(i))))
 	}
 
 	return fmt.Errorf("failed to connect to RabbitMQ after retries: %w", err)

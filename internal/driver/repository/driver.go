@@ -33,30 +33,29 @@ func (r *DriverRepository) GetInfo(ctx context.Context, id string) (model.Driver
 	var vehicleAttrs []byte
 
 	err = tx.QueryRow(ctx, `
-		SELECT u.name, d.rating, d.vehicle_attrs
+		SELECT  d.rating, d.vehicle_attrs
 		FROM drivers d
 		JOIN users u ON u.id = d.id
 		WHERE d.id = $1
-	`, id).Scan(&info.Name, &info.Rating, &vehicleAttrs)
+	`, id).Scan(&info.Rating, &vehicleAttrs)
 
 	if err != nil {
 		return model.DriverInfo{}, err
 	}
 
-	// Парсим JSONB с атрибутами автомобиля
 	if err := json.Unmarshal(vehicleAttrs, &info.Vehicle); err != nil {
 		return model.DriverInfo{}, err
 	}
 
-	// Коммит транзакции
 	if err := tx.Commit(ctx); err != nil {
 		return model.DriverInfo{}, err
 	}
 
 	return info, nil
 }
+
 func (r *DriverRepository) GetDriverIDByRideID(ctx context.Context, rideID string) (string, error) {
-	var driverID *string // Use pointer to handle NULL
+	var DriverID string
 
 	query := `
 		SELECT driver_id
@@ -64,19 +63,15 @@ func (r *DriverRepository) GetDriverIDByRideID(ctx context.Context, rideID strin
 		WHERE id = $1
 	`
 
-	err := r.db.QueryRow(ctx, query, rideID).Scan(&driverID)
+	err := r.db.QueryRow(ctx, query, rideID).Scan(&DriverID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return "", fmt.Errorf("ride with id %s not found", rideID)
 		}
-		return "", fmt.Errorf("failed to get driver_id: %w", err)
+		return "", fmt.Errorf("failed to get passenger_id: %w", err)
 	}
 
-	if driverID == nil {
-		return "", fmt.Errorf("driver not assigned to ride %s", rideID)
-	}
-
-	return *driverID, nil
+	return DriverID, nil
 }
 
 func (r *DriverRepository) GetPickupLocation(ctx context.Context, rideID string) (float64, float64, error) {
@@ -94,47 +89,6 @@ func (r *DriverRepository) GetPickupLocation(ctx context.Context, rideID string)
 	return lat, lng, nil
 }
 
-func (r *DriverRepository) FindNearbyDrivers(ctx context.Context, pickup model.Location, vehicleType usermodel.VehicleType, radiusMeters float64) ([]model.DriverNearby, error) {
-	query := `
-		SELECT d.id, u.email, d.rating, c.latitude, c.longitude,
-		       ST_Distance(
-		         ST_MakePoint(c.longitude, c.latitude)::geography,
-		         ST_MakePoint($1, $2)::geography
-		       ) / 1000 AS distance_km
-		FROM drivers d
-		JOIN users u ON d.id = u.id
-		JOIN coordinates c ON c.entity_id = d.id
-		  AND c.entity_type = 'driver'
-		  AND c.is_current = true
-		WHERE d.status = 'AVAILABLE'
-		  AND d.vehicle_type = $3
-		  AND ST_DWithin(
-		        ST_MakePoint(c.longitude, c.latitude)::geography,
-		        ST_MakePoint($1, $2)::geography,
-		        $4
-		      )
-		ORDER BY distance_km, d.rating DESC
-		LIMIT 10;
-	`
-
-	rows, err := r.db.Query(ctx, query, pickup.Longitude, pickup.Latitude, vehicleType, radiusMeters)
-	if err != nil {
-		return nil, fmt.Errorf("query failed: %w", err)
-	}
-	defer rows.Close()
-
-	var drivers []model.DriverNearby
-	for rows.Next() {
-		var d model.DriverNearby
-		if err := rows.Scan(&d.ID, &d.Email, &d.Rating, &d.Latitude, &d.Longitude, &d.Distance); err != nil {
-			return nil, fmt.Errorf("scan error: %w", err)
-		}
-		drivers = append(drivers, d)
-	}
-
-	return drivers, nil
-}
-
 func (r *DriverRepository) SetOnline(ctx context.Context, driverID uuid.UUID, lat, lon float64) (model.DriverSession, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
@@ -145,9 +99,9 @@ func (r *DriverRepository) SetOnline(ctx context.Context, driverID uuid.UUID, la
 	var session model.DriverSession
 	err = tx.QueryRow(ctx, `
 		INSERT INTO driver_sessions (driver_id, started_at)
-		VALUES ($1, now())
-		RETURNING id, driver_id, started_at
-	`, driverID).Scan(&session.ID, &session.DriverID, &session.StartedAt)
+		VALUES ($1,now())
+		RETURNING id
+	`, driverID).Scan(&session.ID)
 	if err != nil {
 		return model.DriverSession{}, err
 	}
@@ -162,8 +116,8 @@ func (r *DriverRepository) SetOnline(ctx context.Context, driverID uuid.UUID, la
 	}
 
 	_, err = tx.Exec(ctx, `
-		INSERT INTO location_history (driver_id, latitude, longitude, recorded_at)
-		VALUES ($1, $2, $3, now())
+		INSERT INTO location_history ( driver_id, latitude, longitude)
+		VALUES ( $1, $2, $3)
 	`, driverID, lat, lon)
 	if err != nil {
 		return model.DriverSession{}, err
@@ -237,7 +191,7 @@ func (r *DriverRepository) SetOffline(ctx context.Context, driverID uuid.UUID) (
 		WHERE driver_id = $1 AND ended_at IS NULL
 		ORDER BY started_at DESC
 		LIMIT 1
-	`, driverID).Scan(&session.ID, &session.DriverID, &session.StartedAt, &session.TotalRides, &session.TotalEarnings)
+	`, driverID).Scan(&session.ID, &session.StartedAt, &session.TotalRides, &session.TotalEarnings)
 	if err != nil {
 		return model.DriverSession{}, err
 	}
@@ -354,6 +308,7 @@ func (r *DriverRepository) Start(ctx context.Context, driverID uuid.UUID, rideID
 	err = tx.QueryRow(ctx, `
 	UPDATE rides
 	SET status = 'IN_PROGRESS',
+	    arrived_at = now(),
 	    started_at = now(),
 	    updated_at = now()
 	WHERE id = $1
@@ -418,19 +373,11 @@ func (r *DriverRepository) Complete(ctx context.Context, driverID uuid.UUID, dri
 		SET 
 			status = 'COMPLETED',
 			final_fare = $1,
-			final_latitude = $2,
-			final_longitude = $3,
-			actual_distance_km = $4,
-			actual_duration_min = $5,
 			completed_at = now()
-		WHERE driver_id = $6
+		WHERE driver_id = $2
 		RETURNING completed_at
 	`,
 		driverEarning,
-		location.Latitude,
-		location.Longitude,
-		distance,
-		duration,
 		driverID,
 	).Scan(&completedAt)
 
@@ -452,15 +399,27 @@ func (r *DriverRepository) Complete(ctx context.Context, driverID uuid.UUID, dri
 	}
 
 	_, err = tx.Exec(ctx, `
+		UPDATE driver_sessions
+		SET 
+			total_rides = total_rides + 1,
+			total_earnings = total_earnings + $1,
+			ended_at = now()
+		WHERE id = $2
+	`, driverEarning, driverID)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("failed to update driver_sessions stats: %w", err)
+	}
+
+	_, err = tx.Exec(ctx, `
 		INSERT INTO ride_events (ride_id, event_type, event_data)
 		VALUES (
 			(SELECT id FROM rides WHERE driver_id = $1 ORDER BY completed_at DESC LIMIT 1),
 			'RIDE_COMPLETED',
 			jsonb_build_object(
 				'driver_id', $1,
-				'earned', $2,
-				'distance_km', $3,
-				'duration_min', $4,
+				'earned', $2::numeric,
+				'distance_km', $3::numeric,
+				'duration_min', $4::numeric,
 				'completed_at', now()
 			)
 		)

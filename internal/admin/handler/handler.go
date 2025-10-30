@@ -81,7 +81,6 @@ func (h *AdminHandler) GetOnlineDrivers(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Ensure we always return an array, not null
 	if drivers == nil {
 		drivers = make([]model.OnlineDriver, 0)
 	}
@@ -102,7 +101,6 @@ func (h *AdminHandler) GetSystemMetrics(w http.ResponseWriter, r *http.Request) 
 
 	metrics, err := h.service.GetSystemMetrics(r.Context())
 	if err != nil {
-		// Return empty metrics instead of error
 		metrics = &model.SystemMetrics{}
 	}
 

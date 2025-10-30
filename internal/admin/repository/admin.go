@@ -22,7 +22,6 @@ func (r *AdminRepository) GetSystemOverview(ctx context.Context) (*model.SystemO
 		Timestamp: time.Now().UTC(),
 	}
 
-	// Get active rides count
 	err := r.db.QueryRow(ctx, `
 		SELECT COUNT(*) FROM rides WHERE status IN ('REQUESTED', 'MATCHED', 'EN_ROUTE', 'ARRIVED', 'IN_PROGRESS')
 	`).Scan(&overview.Metrics.ActiveRides)
@@ -30,15 +29,12 @@ func (r *AdminRepository) GetSystemOverview(ctx context.Context) (*model.SystemO
 		return nil, fmt.Errorf("failed to get active rides count: %w", err)
 	}
 
-	// Get available drivers count
 	err = r.db.QueryRow(ctx, `
 		SELECT COUNT(*) FROM drivers WHERE status = 'AVAILABLE'
 	`).Scan(&overview.Metrics.AvailableDrivers)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get available drivers count: %w", err)
 	}
-
-	// Get busy drivers count
 	err = r.db.QueryRow(ctx, `
 		SELECT COUNT(*) FROM drivers WHERE status IN ('BUSY', 'EN_ROUTE')
 	`).Scan(&overview.Metrics.BusyDrivers)
@@ -46,7 +42,6 @@ func (r *AdminRepository) GetSystemOverview(ctx context.Context) (*model.SystemO
 		return nil, fmt.Errorf("failed to get busy drivers count: %w", err)
 	}
 
-	// Get today's rides count
 	today := time.Now().Format("2006-01-02")
 	err = r.db.QueryRow(ctx, `
 		SELECT COUNT(*) FROM rides WHERE DATE(created_at) = $1
@@ -55,7 +50,6 @@ func (r *AdminRepository) GetSystemOverview(ctx context.Context) (*model.SystemO
 		return nil, fmt.Errorf("failed to get today's rides count: %w", err)
 	}
 
-	// Get today's revenue
 	err = r.db.QueryRow(ctx, `
 		SELECT COALESCE(SUM(final_fare), 0) FROM rides 
 		WHERE DATE(created_at) = $1 AND status = 'COMPLETED'
@@ -64,7 +58,6 @@ func (r *AdminRepository) GetSystemOverview(ctx context.Context) (*model.SystemO
 		return nil, fmt.Errorf("failed to get today's revenue: %w", err)
 	}
 
-	// Get driver distribution by vehicle type
 	rows, err := r.db.Query(ctx, `
 		SELECT vehicle_type, COUNT(*) 
 		FROM drivers 
@@ -86,7 +79,6 @@ func (r *AdminRepository) GetSystemOverview(ctx context.Context) (*model.SystemO
 		overview.DriverDistribution[vehicleType] = count
 	}
 
-	// Get hotspots (simplified - locations with most active rides)
 	rows, err = r.db.Query(ctx, `
 		SELECT c.address, COUNT(r.id) as active_rides,
 			   (SELECT COUNT(*) FROM drivers d 
@@ -124,7 +116,6 @@ func (r *AdminRepository) GetActiveRides(ctx context.Context, page, pageSize int
 
 	offset := (page - 1) * pageSize
 
-	// Get total count
 	err := r.db.QueryRow(ctx, `
 		SELECT COUNT(*) FROM rides WHERE status IN ('REQUESTED', 'MATCHED', 'EN_ROUTE', 'ARRIVED', 'IN_PROGRESS')
 	`).Scan(&response.TotalCount)
@@ -132,7 +123,6 @@ func (r *AdminRepository) GetActiveRides(ctx context.Context, page, pageSize int
 		return nil, fmt.Errorf("failed to get active rides count: %w", err)
 	}
 
-	// Get active rides with details
 	rows, err := r.db.Query(ctx, `
 		SELECT 
 			r.id, r.ride_number, r.status, r.passenger_id, r.driver_id,
@@ -238,10 +228,9 @@ func (r *AdminRepository) GetOnlineDrivers(ctx context.Context) ([]model.OnlineD
 func (r *AdminRepository) GetSystemMetrics(ctx context.Context) (*model.SystemMetrics, error) {
 	metrics := &model.SystemMetrics{}
 
-	// Get basic metrics first
 	overview, err := r.GetSystemOverview(ctx)
 	if err != nil {
-		return metrics, nil // Return empty metrics instead of error
+		return metrics, nil
 	}
 
 	metrics.ActiveRides = overview.Metrics.ActiveRides
@@ -250,7 +239,6 @@ func (r *AdminRepository) GetSystemMetrics(ctx context.Context) (*model.SystemMe
 	metrics.TotalRidesToday = overview.Metrics.TotalRidesToday
 	metrics.TotalRevenueToday = overview.Metrics.TotalRevenueToday
 
-	// Calculate average wait time (time from requested to matched)
 	err = r.db.QueryRow(ctx, `
 		SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (matched_at - requested_at)) / 60), 0)
 		FROM rides 
@@ -261,7 +249,6 @@ func (r *AdminRepository) GetSystemMetrics(ctx context.Context) (*model.SystemMe
 		metrics.AverageWaitTimeMinutes = 0
 	}
 
-	// Calculate average ride duration
 	err = r.db.QueryRow(ctx, `
 		SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (completed_at - started_at)) / 60), 0)
 		FROM rides 
@@ -272,7 +259,6 @@ func (r *AdminRepository) GetSystemMetrics(ctx context.Context) (*model.SystemMe
 		metrics.AverageRideDurationMinutes = 0
 	}
 
-	// Calculate cancellation rate
 	err = r.db.QueryRow(ctx, `
 		SELECT 
 			COALESCE(
