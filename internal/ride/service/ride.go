@@ -56,17 +56,16 @@ func (s *RideService) ListenForDriver(ctx context.Context, queueName string) {
 				return
 			}
 
-			passId := "passenger_" + passengerID
-			logger.Info("send_to_passenger",
-				fmt.Sprintf("отправка пассажиру %s: %s", passengerID, string(data)),
-				"", msg.RideID)
-
-			s.wsHub.SendToClient(passId, data)
-
 			err = s.repo.UpdateRideStatusMatched(ctx, msg.RideID, msg.DriverID)
 			if err != nil {
 				logger.Error("update_status_failed", "ошибка при обновлении статуса поездки", "", msg.RideID, err.Error())
 			}
+
+			passId := "passenger_" + passengerID
+			logger.Info("send_to_passenger",
+				fmt.Sprintf("отправка пассажиру %s: %s", passengerID, string(data)),
+				"", msg.RideID)
+			s.wsHub.SendToClient(passId, data)
 		} else {
 			logger.Warn("driver_declined", "водитель отклонил поездку", "", msg.RideID,
 				fmt.Sprintf("driver_id=%s", msg.DriverID))

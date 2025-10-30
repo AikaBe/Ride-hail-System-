@@ -49,6 +49,12 @@ func (r *RideRepository) GetPassengerIDByRideID(ctx context.Context, rideID stri
 }
 
 func (r *RideRepository) UpdateRideStatusMatched(ctx context.Context, rideID string, driverID string) error {
+	tx, err := r.DB.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
 	query := `
 		UPDATE rides
 		SET 
@@ -59,11 +65,24 @@ func (r *RideRepository) UpdateRideStatusMatched(ctx context.Context, rideID str
 		WHERE id = $3;
 	`
 
-	_, err := r.DB.Exec(ctx, query, driverID, time.Now().UTC(), rideID)
+	_, err = tx.Exec(ctx, query, driverID, time.Now().UTC(), rideID)
 	if err != nil {
 		return err
 	}
 
+	eventQuery := `
+		INSERT INTO ride_events (ride_id, event_type, event_data, created_at)
+		VALUES ($1, 'DRIVER_MATCHED', json_build_object('driver_id', $2::text), now());
+	`
+
+	_, err = tx.Exec(ctx, eventQuery, rideID, driverID)
+	if err != nil {
+		return fmt.Errorf("failed to insert ride event: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
 	return nil
 }
 

@@ -11,6 +11,7 @@ import (
 	"ride-hail/internal/user/jwt"
 	usermodel "ride-hail/internal/user/model"
 	"ride-hail/pkg/uuid"
+	"strings"
 )
 
 type DriverHandler struct {
@@ -48,11 +49,11 @@ func (h *DriverHandler) GoOnline(w http.ResponseWriter, r *http.Request) {
 
 	claims, err := h.jwtManager.ExtractClaims(w, r)
 
-	if claims.ID != driverID {
+	if strings.TrimSpace(claims.UserID) != strings.TrimSpace(driverID) {
 		http.Error(w, "forbidden: token does not match driver", http.StatusForbidden)
 		return
 	}
-	if claims.Role != string(usermodel.RoleDriver) {
+	if strings.TrimSpace(claims.Role) != strings.TrimSpace(string(usermodel.RoleDriver)) {
 		http.Error(w, "forbidden: not authorized", http.StatusUnauthorized)
 		return
 	}
@@ -95,7 +96,7 @@ func (h *DriverHandler) GoOffline(w http.ResponseWriter, r *http.Request) {
 
 	claims, err := h.jwtManager.ExtractClaims(w, r)
 
-	if claims.ID != driverID {
+	if claims.UserID != driverID {
 		http.Error(w, "forbidden: token does not match driver", http.StatusForbidden)
 		return
 	}
@@ -140,7 +141,7 @@ func (h *DriverHandler) UpdateLocation(w http.ResponseWriter, r *http.Request) {
 
 	claims, err := h.jwtManager.ExtractClaims(w, r)
 
-	if claims.ID != driverID {
+	if claims.UserID != driverID {
 		http.Error(w, "forbidden: token does not match driver", http.StatusForbidden)
 		return
 	}
@@ -190,7 +191,7 @@ func (h *DriverHandler) Start(w http.ResponseWriter, r *http.Request) {
 
 	claims, err := h.jwtManager.ExtractClaims(w, r)
 
-	if claims.ID != driverID {
+	if claims.UserID != driverID {
 		http.Error(w, "forbidden: token does not match driver", http.StatusForbidden)
 		return
 	}
@@ -230,7 +231,7 @@ func (h *DriverHandler) Complete(w http.ResponseWriter, r *http.Request) {
 
 	claims, err := h.jwtManager.ExtractClaims(w, r)
 
-	if claims.ID != driverID {
+	if claims.UserID != driverID {
 		http.Error(w, "forbidden: token does not match driver", http.StatusForbidden)
 		return
 	}
