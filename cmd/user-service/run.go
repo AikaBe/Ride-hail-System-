@@ -13,7 +13,7 @@ import (
 
 func RunUser(db *pgx.Conn, mux *http.ServeMux, jwtManager *jwt.Manager) {
 	logger.SetServiceName("user-service")
-
+	
 	logger.Info("startup", "Starting User Service...", "", "")
 
 	userRepo := repository.NewUserRepository(db)

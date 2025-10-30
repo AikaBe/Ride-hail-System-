@@ -38,7 +38,7 @@ func RunRide(
 
 	repo := repository.NewRideRepository(conn)
 	svc := service.NewRideManager(repo, rmqClient, hub)
-	h := ridehttp.NewRideHandler(svc)
+	h := ridehttp.NewRideHandler(svc, jwtManager)
 
 	go func() {
 		logger.Info("listener_driver", "Listening for driver responses...", "", "")

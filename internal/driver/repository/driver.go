@@ -123,6 +123,36 @@ func (r *DriverRepository) SetOnline(ctx context.Context, driverID uuid.UUID, la
 		return model.DriverSession{}, err
 	}
 
+	// Check if coordinate already exists for this driver
+	var existingCoordID string
+	err = tx.QueryRow(ctx, `
+		SELECT id FROM coordinates 
+		WHERE entity_id = $1 AND entity_type = 'driver' AND is_current = true
+	`, driverID).Scan(&existingCoordID)
+
+	if err != nil && err != pgx.ErrNoRows {
+		return model.DriverSession{}, err
+	}
+
+	if err == pgx.ErrNoRows {
+		// No existing coordinate, insert new one
+		_, err = tx.Exec(ctx, `
+			INSERT INTO coordinates (entity_id, entity_type, address, latitude, longitude, is_current)
+			VALUES ($1, 'driver', 'Current location', $2, $3, true)
+		`, driverID, lat, lon)
+	} else {
+		// Update existing coordinate
+		_, err = tx.Exec(ctx, `
+			UPDATE coordinates 
+			SET latitude = $1, longitude = $2, updated_at = now()
+			WHERE id = $3
+		`, lat, lon, existingCoordID)
+	}
+
+	if err != nil {
+		return model.DriverSession{}, err
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return model.DriverSession{}, err
 	}
@@ -138,8 +168,25 @@ func (r *DriverRepository) SetOffline(ctx context.Context, driverID uuid.UUID) (
 	defer tx.Rollback(ctx)
 
 	var session model.DriverSession
+	// FIX: Check if session exists first
+	var sessionExists bool
 	err = tx.QueryRow(ctx, `
-		SELECT id, started_at, total_rides, total_earnings
+		SELECT EXISTS(
+			SELECT 1 FROM driver_sessions 
+			WHERE driver_id = $1 AND ended_at IS NULL
+		)
+	`, driverID).Scan(&sessionExists)
+	if err != nil {
+		return model.DriverSession{}, err
+	}
+
+	if !sessionExists {
+		return model.DriverSession{}, fmt.Errorf("no active session found for driver")
+	}
+
+	// FIX: Scan correct number of columns
+	err = tx.QueryRow(ctx, `
+		SELECT id, driver_id, started_at, total_rides, total_earnings
 		FROM driver_sessions
 		WHERE driver_id = $1 AND ended_at IS NULL
 		ORDER BY started_at DESC
