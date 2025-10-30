@@ -353,15 +353,7 @@ wscat -c ws://localhost:3000/ws/drivers/
 
 #### 2. Driver Accepts Ride
 ```json
-{
-  "type": "ride_response", 
-  "ride_id": "4bf152a5-0ce1-4e92-ae42-982fcab05aab",
-  "accepted": true,
-  "current_location": {
-    "latitude": 43.235,
-    "longitude": 76.885
-  }
-}
+r
 ```
 
 #### 3. Passenger Notified of Match

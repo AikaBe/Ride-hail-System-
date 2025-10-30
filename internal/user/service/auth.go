@@ -2,10 +2,13 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/jackc/pgx/v5"
-	"golang.org/x/crypto/bcrypt"
 	"ride-hail/internal/common/logger"
 	"ride-hail/internal/user/handler/dto"
 	token "ride-hail/internal/user/jwt"
@@ -186,13 +189,34 @@ func (s *AuthService) RefreshToken(ctx context.Context, req dto.RefreshTokenRequ
 }
 
 func hashPassword(password string) (string, error) {
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	salt := make([]byte, 16)
+	_, err := rand.Read(salt)
 	if err != nil {
 		return "", err
 	}
-	return string(hash), nil
+
+	hash := sha256.Sum256(append(salt, []byte(password)...))
+
+	return fmt.Sprintf("%x:%x", salt, hash[:]), nil
 }
 
-func checkPassword(hash, password string) bool {
-	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
+func checkPassword(hashPassword, password string) bool {
+	var saltHex, hashHex string
+	_, err := fmt.Sscanf(hashPassword, "%32s:%64s", &saltHex, &hashHex)
+	if err != nil {
+		return false
+	}
+
+	salt, err := hex.DecodeString(saltHex)
+	if err != nil {
+		return false
+	}
+	storedHash, err := hex.DecodeString(hashHex)
+	if err != nil {
+		return false
+	}
+
+	hash := sha256.Sum256(append(salt, []byte(password)...))
+
+	return subtle.ConstantTimeCompare(storedHash, hash[:]) == 1
 }
