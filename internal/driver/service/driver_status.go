@@ -6,17 +6,18 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"ride-hail/internal/common/logger"
-	commonmq "ride-hail/internal/common/rmq"
-	"ride-hail/internal/common/websocket"
-	"ride-hail/internal/driver/handler/dto"
-	"ride-hail/internal/driver/model"
-	"ride-hail/internal/driver/rmq"
-	model2 "ride-hail/internal/ride/model"
-	usermodel "ride-hail/internal/user/model"
-	"ride-hail/pkg/uuid"
 	"strings"
 	"time"
+
+	"ride-hail-system/internal/common/logger"
+	commonmq "ride-hail-system/internal/common/rmq"
+	"ride-hail-system/internal/common/websocket"
+	"ride-hail-system/internal/driver/handler/dto"
+	"ride-hail-system/internal/driver/model"
+	"ride-hail-system/internal/driver/rmq"
+	model2 "ride-hail-system/internal/ride/model"
+	usermodel "ride-hail-system/internal/user/model"
+	"ride-hail-system/pkg/uuid"
 )
 
 type DriverRepository interface {

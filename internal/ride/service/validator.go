@@ -3,8 +3,9 @@ package service
 import (
 	"fmt"
 	"math"
-	"ride-hail/internal/ride/model"
-	usermodel "ride-hail/internal/user/model"
+
+	"ride-hail-system/internal/ride/model"
+	usermodel "ride-hail-system/internal/user/model"
 )
 
 func (s *RideService) validateRideRequest(ride model.Ride) error {

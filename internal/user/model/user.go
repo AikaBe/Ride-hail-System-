@@ -2,8 +2,9 @@ package model
 
 import (
 	"encoding/json"
-	"ride-hail/pkg/uuid"
 	"time"
+
+	"ride-hail-system/pkg/uuid"
 )
 
 type EntityType string

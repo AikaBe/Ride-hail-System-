@@ -6,16 +6,19 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"ride-hail/internal/common/logger"
-	common "ride-hail/internal/common/rmq"
-	"ride-hail/internal/common/websocket"
-	"ride-hail/internal/ride/model"
-	usermodel "ride-hail/internal/user/model"
-	"ride-hail/pkg/uuid"
-
-	"ride-hail/internal/ride/repository"
-	rmqClient "ride-hail/internal/ride/rmq"
 	"time"
+
+	"ride-hail-system/internal/common/logger"
+	"ride-hail-system/internal/common/websocket"
+	"ride-hail-system/internal/ride/model"
+	"ride-hail-system/internal/ride/repository"
+	"ride-hail-system/pkg/uuid"
+
+	common "ride-hail-system/internal/common/rmq"
+
+	usermodel "ride-hail-system/internal/user/model"
+
+	rmqClient "ride-hail-system/internal/ride/rmq"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -72,7 +75,6 @@ func (s *RideService) ListenForDriver(ctx context.Context, queueName string) {
 				fmt.Sprintf("driver_id=%s", msg.DriverID))
 		}
 	})
-
 	if err != nil {
 		logger.Error("consume_driver_responses_failed",
 			fmt.Sprintf("ошибка при чтении сообщений очереди %s", queueName),
@@ -124,6 +126,11 @@ func (s *RideService) LocationUpdate(ctx context.Context, queueName string) {
 			return
 		}
 
+		err = s.repo.UpdateLocation(ctx, msg.RideID, passengerID)
+		if err != nil {
+			logger.Error("insert updated status", "cannot update ride event", "", msg.RideID, err.Error())
+			return
+		}
 		passId := "passenger_" + passengerID
 		logger.Info("send_location_to_passenger",
 			fmt.Sprintf("отправка пассажиру %s: %s", passengerID, string(data)),
@@ -131,7 +138,6 @@ func (s *RideService) LocationUpdate(ctx context.Context, queueName string) {
 
 		s.wsHub.SendToClient(passId, data)
 	})
-
 	if err != nil {
 		logger.Error("consume_location_failed",
 			fmt.Sprintf("ошибка при чтении сообщений очереди %s", queueName),

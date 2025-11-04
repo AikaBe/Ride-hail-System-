@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"ride-hail/internal/driver/model"
-	ridemodel "ride-hail/internal/ride/model"
-	usermodel "ride-hail/internal/user/model"
-	"ride-hail/pkg/uuid"
 	"time"
+
+	"ride-hail-system/internal/driver/model"
+	ridemodel "ride-hail-system/internal/ride/model"
+	usermodel "ride-hail-system/internal/user/model"
+	"ride-hail-system/pkg/uuid"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -38,7 +39,6 @@ func (r *DriverRepository) GetInfo(ctx context.Context, id string) (model.Driver
 		JOIN users u ON u.id = d.id
 		WHERE d.id = $1
 	`, id).Scan(&info.Rating, &vehicleAttrs)
-
 	if err != nil {
 		return model.DriverInfo{}, err
 	}
@@ -168,7 +168,7 @@ func (r *DriverRepository) SetOffline(ctx context.Context, driverID uuid.UUID) (
 	defer tx.Rollback(ctx)
 
 	var session model.DriverSession
-	// FIX: Check if session exists first
+
 	var sessionExists bool
 	err = tx.QueryRow(ctx, `
 		SELECT EXISTS(
@@ -181,17 +181,22 @@ func (r *DriverRepository) SetOffline(ctx context.Context, driverID uuid.UUID) (
 	}
 
 	if !sessionExists {
-		return model.DriverSession{}, fmt.Errorf("no active session found for driver")
+		return model.DriverSession{}, fmt.Errorf("no active session found for driver %s", driverID)
 	}
 
-	// FIX: Scan correct number of columns
 	err = tx.QueryRow(ctx, `
 		SELECT id, driver_id, started_at, total_rides, total_earnings
 		FROM driver_sessions
 		WHERE driver_id = $1 AND ended_at IS NULL
 		ORDER BY started_at DESC
 		LIMIT 1
-	`, driverID).Scan(&session.ID, &session.StartedAt, &session.TotalRides, &session.TotalEarnings)
+	`, driverID).Scan(
+		&session.ID,
+		&session.DriverID,
+		&session.StartedAt,
+		&session.TotalRides,
+		&session.TotalEarnings,
+	)
 	if err != nil {
 		return model.DriverSession{}, err
 	}
@@ -218,8 +223,8 @@ func (r *DriverRepository) SetOffline(ctx context.Context, driverID uuid.UUID) (
 		return model.DriverSession{}, err
 	}
 
-	endedAt := time.Now()
-	session.EndedAt = &endedAt
+	now := time.Now()
+	session.EndedAt = &now
 
 	return session, nil
 }
@@ -390,7 +395,6 @@ func (r *DriverRepository) Complete(ctx context.Context, driverID uuid.UUID, dri
 		driverEarning,
 		driverID,
 	).Scan(&completedAt)
-
 	if err != nil {
 		return time.Time{}, fmt.Errorf("failed to update ride: %w", err)
 	}
@@ -452,7 +456,6 @@ func (r *DriverRepository) GetRideStatus(ctx context.Context, driverID, rideID u
 		FROM rides 
 		WHERE id = $1 AND driver_id = $2
 	`, rideID, driverID).Scan(&status)
-
 	if err != nil {
 		return "", fmt.Errorf("failed to get ride status: %w", err)
 	}

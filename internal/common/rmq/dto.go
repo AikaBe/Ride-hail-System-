@@ -1,8 +1,9 @@
 package rmq
 
 import (
-	usermodel "ride-hail/internal/user/model"
 	"time"
+
+	usermodel "ride-hail-system/internal/user/model"
 )
 
 type RideRequestedMessage struct {
@@ -75,6 +76,7 @@ type RideStatusUpdateMessage struct {
 	Status  string `json:"status"`
 	Message string `json:"message,omitempty"`
 }
+
 type PassiNFO struct {
 	Type           string         `json:"type"`            // тип сообщения, например "ride_details"
 	RideID         string         `json:"ride_id"`         // ID поездки

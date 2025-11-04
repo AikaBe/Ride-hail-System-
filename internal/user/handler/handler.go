@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"ride-hail/internal/common/logger"
-	"ride-hail/internal/user/handler/dto"
-	"ride-hail/internal/user/service"
+	"ride-hail-system/internal/common/logger"
+	"ride-hail-system/internal/user/handler/dto"
+	"ride-hail-system/internal/user/service"
 )
 
 type AuthHandler struct {

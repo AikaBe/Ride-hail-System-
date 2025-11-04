@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"ride-hail/internal/common/logger"
-	"ride-hail/internal/common/rmq"
 	"time"
+
+	"ride-hail-system/internal/common/logger"
+	"ride-hail-system/internal/common/rmq"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )

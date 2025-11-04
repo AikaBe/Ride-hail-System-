@@ -8,12 +8,15 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+
+	"ride-hail-system/internal/common/logger"
+	"ride-hail-system/internal/user/handler/dto"
+	"ride-hail-system/internal/user/model"
+	"ride-hail-system/pkg/uuid"
+
+	token "ride-hail-system/internal/user/jwt"
+
 	"github.com/jackc/pgx/v5"
-	"ride-hail/internal/common/logger"
-	"ride-hail/internal/user/handler/dto"
-	token "ride-hail/internal/user/jwt"
-	"ride-hail/internal/user/model"
-	"ride-hail/pkg/uuid"
 )
 
 type UserRepository interface {

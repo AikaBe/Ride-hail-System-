@@ -2,11 +2,12 @@ package jwt
 
 import (
 	"errors"
-	"github.com/golang-jwt/jwt/v5"
 	"log"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type Manager struct {
@@ -104,7 +105,6 @@ func (m *Manager) ValidateToken(tokenString string) (*Claims, error) {
 }
 
 func (m *Manager) ExtractClaims(w http.ResponseWriter, r *http.Request) (Claims, error) {
-
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
 		http.Error(w, "missing Authorization header", http.StatusUnauthorized)

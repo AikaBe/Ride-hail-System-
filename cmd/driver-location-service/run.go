@@ -3,23 +3,24 @@ package driver_location_service
 import (
 	"context"
 	"net/http"
-	"ride-hail/internal/common/config"
-	"ride-hail/internal/common/logger"
-	commonrmq "ride-hail/internal/common/rmq"
-	"ride-hail/internal/common/websocket"
-	"ride-hail/internal/driver/handler"
-	"ride-hail/internal/driver/repository"
-	driverrmq "ride-hail/internal/driver/rmq"
-	"ride-hail/internal/driver/service"
-	driverws "ride-hail/internal/driver/websocket"
-	"ride-hail/internal/user/jwt"
+
+	"ride-hail-system/internal/common/config"
+	"ride-hail-system/internal/common/logger"
+	commonrmq "ride-hail-system/internal/common/rmq"
+	"ride-hail-system/internal/common/websocket"
+	"ride-hail-system/internal/driver/handler"
+	"ride-hail-system/internal/driver/repository"
+	driverrmq "ride-hail-system/internal/driver/rmq"
+	"ride-hail-system/internal/driver/service"
+	driverws "ride-hail-system/internal/driver/websocket"
+	"ride-hail-system/internal/user/jwt"
 
 	"github.com/jackc/pgx/v5"
 )
 
 func RunDriver(cfg *config.Config, conn *pgx.Conn, commonMq *commonrmq.RabbitMQ, mux *http.ServeMux, hub *websocket.Hub, wsMux *http.ServeMux, jwtManager *jwt.Manager) {
 	logger.SetServiceName("driver-location-service")
-	
+
 	logger.Info("startup", "Starting Driver & Location Service...", "", "")
 
 	rmqClient, err := driverrmq.NewClient(commonMq.URL, "driver_topic")

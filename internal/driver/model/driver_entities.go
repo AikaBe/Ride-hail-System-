@@ -1,8 +1,9 @@
 package model
 
 import (
-	"ride-hail/pkg/uuid"
 	"time"
+
+	"ride-hail-system/pkg/uuid"
 )
 
 type DriverSession struct {
@@ -40,6 +41,7 @@ type DriverNearby struct {
 	Longitude float64 `json:"longitude"`
 	Distance  float64 `json:"distance_km"`
 }
+
 type DriverResponceWS struct {
 	Type            string `json:"type"`     // тип сообщения (например, "ride_response")
 	OfferID         string `json:"offer_id"` // ID предложения

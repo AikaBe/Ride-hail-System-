@@ -3,8 +3,9 @@ package db
 import (
 	"context"
 	"fmt"
-	"ride-hail/internal/common/logger"
 	"time"
+
+	"ride-hail-system/internal/common/logger"
 
 	"github.com/jackc/pgx/v5"
 )

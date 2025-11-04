@@ -3,11 +3,11 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
-	"ride-hail/internal/admin/model"
-	"ride-hail/internal/admin/service"
 	"strconv"
 
-	"ride-hail/internal/common/logger"
+	"ride-hail-system/internal/admin/model"
+	"ride-hail-system/internal/admin/service"
+	"ride-hail-system/internal/common/logger"
 )
 
 type AdminHandler struct {

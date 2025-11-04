@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"ride-hail-system/internal/user/model"
+
 	"github.com/jackc/pgx/v5"
-	"ride-hail/internal/user/model"
 )
 
 type UserRepository struct {
@@ -143,7 +144,6 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (model.Us
 		&user.PasswordHash,
 		&user.Attrs,
 	)
-
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return model.User{}, fmt.Errorf("user not found: %w", err)

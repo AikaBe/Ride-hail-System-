@@ -5,8 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"ride-hail/internal/user/model"
 	"strings"
+
+	"ride-hail-system/internal/user/model"
 )
 
 type RegisterRequest struct {

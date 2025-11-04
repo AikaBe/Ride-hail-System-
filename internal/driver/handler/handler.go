@@ -4,14 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"ride-hail/internal/common/logger"
-	"ride-hail/internal/driver/handler/dto"
-	"ride-hail/internal/driver/model"
-	"ride-hail/internal/driver/service"
-	"ride-hail/internal/user/jwt"
-	usermodel "ride-hail/internal/user/model"
-	"ride-hail/pkg/uuid"
 	"strings"
+
+	"ride-hail-system/internal/common/logger"
+	"ride-hail-system/internal/driver/handler/dto"
+	"ride-hail-system/internal/driver/model"
+	"ride-hail-system/internal/driver/service"
+	"ride-hail-system/internal/user/jwt"
+	usermodel "ride-hail-system/internal/user/model"
+	"ride-hail-system/pkg/uuid"
 )
 
 type DriverHandler struct {

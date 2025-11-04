@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"ride-hail/internal/ride/model"
-	"ride-hail/pkg/uuid"
 	"time"
+
+	"ride-hail-system/internal/ride/model"
+	"ride-hail-system/pkg/uuid"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -188,7 +189,6 @@ func (r *RideRepository) InsertCoordinate(ctx context.Context, tx pgx.Tx, coordi
 		coordinate.Latitude,
 		coordinate.Longitude,
 	).Scan(&id)
-
 	if err != nil {
 		return "", fmt.Errorf("failed to insert coordinate: %w", err)
 	}

@@ -3,16 +3,17 @@ package ride_service
 import (
 	"context"
 	"net/http"
-	"ride-hail/internal/common/config"
-	"ride-hail/internal/common/logger"
-	commonrmq "ride-hail/internal/common/rmq"
-	"ride-hail/internal/common/websocket"
-	ridehttp "ride-hail/internal/ride/handler"
-	"ride-hail/internal/ride/repository"
-	ridermq "ride-hail/internal/ride/rmq"
-	"ride-hail/internal/ride/service"
-	ridews "ride-hail/internal/ride/websocket"
-	"ride-hail/internal/user/jwt"
+
+	"ride-hail-system/internal/common/config"
+	"ride-hail-system/internal/common/logger"
+	commonrmq "ride-hail-system/internal/common/rmq"
+	"ride-hail-system/internal/common/websocket"
+	ridehttp "ride-hail-system/internal/ride/handler"
+	"ride-hail-system/internal/ride/repository"
+	ridermq "ride-hail-system/internal/ride/rmq"
+	"ride-hail-system/internal/ride/service"
+	ridews "ride-hail-system/internal/ride/websocket"
+	"ride-hail-system/internal/user/jwt"
 
 	"github.com/jackc/pgx/v5"
 )

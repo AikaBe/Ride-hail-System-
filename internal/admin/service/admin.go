@@ -2,7 +2,8 @@ package service
 
 import (
 	"context"
-	"ride-hail/internal/admin/model"
+
+	"ride-hail-system/internal/admin/model"
 )
 
 type AdminRepository interface {

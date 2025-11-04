@@ -2,9 +2,10 @@ package dto
 
 import (
 	"fmt"
-	"ride-hail/internal/ride/model"
-	usermodel "ride-hail/internal/user/model"
-	"ride-hail/pkg/uuid"
+
+	"ride-hail-system/internal/ride/model"
+	usermodel "ride-hail-system/internal/user/model"
+	"ride-hail-system/pkg/uuid"
 )
 
 // MapRideRequestToEntities maps raw HTTP request data into domain uuid.

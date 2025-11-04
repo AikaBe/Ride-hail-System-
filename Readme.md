@@ -83,7 +83,7 @@ graph TB
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/maru-tm/ride-hail.git
+git clone git@git.platform.alem.school:abeiseke/ride-hail.git
 cd ride-hail
 ```
 
@@ -133,7 +133,8 @@ Content-Type: application/json
   "role": "PASSENGER"
 }
 ```
-
+4525f0e1-f69c-407d-866c-6146cf5f0f4e passenger
+7405d91b-9496-42ac-8e7a-b463ca68bd86 driver
 #### 🔐 Register Driver
 ```http
 POST /register
@@ -353,7 +354,15 @@ wscat -c ws://localhost:3000/ws/drivers/
 
 #### 2. Driver Accepts Ride
 ```json
-r
+{
+  "type": "ride_response", 
+  "ride_id": "4bf152a5-0ce1-4e92-ae42-982fcab05aab",
+  "accepted": true,
+  "current_location": {
+    "latitude": 43.235,
+    "longitude": 76.885
+  }
+}
 ```
 
 #### 3. Passenger Notified of Match

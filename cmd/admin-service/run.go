@@ -2,11 +2,12 @@ package admin_service
 
 import (
 	"net/http"
-	"ride-hail/internal/admin/handler"
-	"ride-hail/internal/admin/repository"
-	"ride-hail/internal/admin/service"
-	"ride-hail/internal/common/config"
-	"ride-hail/internal/common/logger"
+
+	"ride-hail-system/internal/admin/handler"
+	"ride-hail-system/internal/admin/repository"
+	"ride-hail-system/internal/admin/service"
+	"ride-hail-system/internal/common/config"
+	"ride-hail-system/internal/common/logger"
 
 	"github.com/jackc/pgx/v5"
 )

@@ -1,8 +1,8 @@
 package dto
 
 import (
-	usermodel "ride-hail/internal/user/model"
-	"ride-hail/pkg/uuid"
+	usermodel "ride-hail-system/internal/user/model"
+	"ride-hail-system/pkg/uuid"
 )
 
 type OnlineRequest struct {
@@ -49,6 +49,7 @@ type StartRequest struct {
 		Longitude float64 `json:"longitude"`
 	} `json:"driver_location"`
 }
+
 type StartResponse struct {
 	RideID    string                 `json:"ride_id"`
 	Status    usermodel.DriverStatus `json:"status"`
