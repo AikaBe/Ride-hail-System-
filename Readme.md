@@ -83,7 +83,7 @@ graph TB
 
 1. **Clone the repository**
 ```bash
-git clone git@git.platform.alem.school:abeiseke/ride-hail.git
+git clone git@github.com:AikaBe/Ride-hail-System-.git
 cd ride-hail
 ```
 
